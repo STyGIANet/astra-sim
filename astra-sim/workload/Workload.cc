@@ -95,6 +95,7 @@ void Workload::initialize_comm_group(string comm_group_filename) {
             // they want to communicate with each other
         }
     }
+    inFile.close();
 }
 
 void Workload::issue_dep_free_nodes() {

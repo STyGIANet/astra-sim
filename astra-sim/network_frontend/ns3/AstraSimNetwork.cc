@@ -183,6 +183,8 @@ void read_logical_topo_config(string network_configuration,
     cout << "There are " << num_npus << " npus: " << dimstr.str() << "\n";
 
     queues_per_dim = vector<int>(logical_dims.size(), num_queues_per_dim);
+
+    inFile.close();
 }
 
 // Read command line arguments.
