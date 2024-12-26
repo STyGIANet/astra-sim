@@ -99,6 +99,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
             else{
                 // std::cout << "src " << rank << " send_flow_args.size(): " << send_flow_args.size() << std::endl;
                 // Send all flows in this batch
+                // This is the opportunity to do something with this batch of flows that go into the network.
+                // ToDO
                 for (auto& send_flow_arg : send_flow_args) {
                     send_flow(std::get<0>(send_flow_arg), std::get<1>(send_flow_arg), std::get<2>(send_flow_arg), 
                         std::get<3>(send_flow_arg), std::get<4>(send_flow_arg), std::get<5>(send_flow_arg));
