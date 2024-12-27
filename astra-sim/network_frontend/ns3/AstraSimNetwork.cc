@@ -3,10 +3,12 @@
 #include "extern/remote_memory_backend/analytical/AnalyticalRemoteMemory.hh"
 #include <json/json.hpp>
 
+#include "astra-sim/common/Logging.hh"
 #include "entry.h"
 #include "ns3/applications-module.h"
 #include "ns3/core-module.h"
 #include "ns3/csma-module.h"
+#include "ns3/event-id.h"  // STyGIANet: For timers in Ethereal
 #include "ns3/internet-module.h"
 #include "ns3/network-module.h"
 #include <execinfo.h>
@@ -18,8 +20,6 @@
 #include <thread>
 #include <unistd.h>
 #include <vector>
-#include "astra-sim/common/Logging.hh"
-#include "ns3/event-id.h" // STyGIANet: For timers in Ethereal
 
 using namespace std;
 using namespace ns3;
@@ -38,8 +38,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     }
 
     // STyGIANet
-    // This vector holds all the send calls issued by the system layer within a time window.
-    using SendFlowArgs = std::tuple<int, int, uint64_t, void (*)(void*), void*, int>;
+    // This vector holds all the send calls issued by the system layer within a
+    // time window.
+    using SendFlowArgs =
+        std::tuple<int, int, uint64_t, void (*)(void*), void*, int>;
     std::vector<SendFlowArgs> send_flow_args;
 
     bool enableEthereal;
@@ -96,53 +98,64 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         int src_id = rank;
 
         // STyGIANet
-        if (enableEthereal){
-            if (!batchTimer.IsPending() && message_size == 0){
-                // Assuming that sys layer would never call send with message size 0.
-                // So this is a signal by the timer to send all the flows in the batch.
+        if (enableEthereal) {
+            if (!batchTimer.IsPending() && message_size == 0) {
+                // Assuming that sys layer would never call send with message
+                // size 0. So this is a signal by the timer to send all the
+                // flows in the batch.
                 if (send_flow_args.size() == 0) {
                     // nothing to send
-                    std::cout << "Who scheduled a message with zero size?! How is the vector size zero too?" << std::endl;
+                    std::cout << "Who scheduled a message with zero size?! How "
+                                 "is the vector size zero too?"
+                              << std::endl;
                     exit(0);
-                }
-                else{
-                    // std::cout << "src " << rank << " send_flow_args.size(): " << send_flow_args.size() << std::endl;
-                    // Send all flows in this batch
-                    // This is the opportunity to do something with this batch of flows that go into the network.
-                    // ToDO
+                } else {
+                    // std::cout << "src " << rank << " send_flow_args.size(): "
+                    // << send_flow_args.size() << std::endl; Send all flows in
+                    // this batch This is the opportunity to do something with
+                    // this batch of flows that go into the network. ToDO
                     for (auto& send_flow_arg : send_flow_args) {
-                        send_flow(std::get<0>(send_flow_arg), std::get<1>(send_flow_arg), std::get<2>(send_flow_arg), 
-                            std::get<3>(send_flow_arg), std::get<4>(send_flow_arg), std::get<5>(send_flow_arg));
+                        send_flow(std::get<0>(send_flow_arg),
+                                  std::get<1>(send_flow_arg),
+                                  std::get<2>(send_flow_arg),
+                                  std::get<3>(send_flow_arg),
+                                  std::get<4>(send_flow_arg),
+                                  std::get<5>(send_flow_arg));
                     }
                     // clear the batch
                     send_flow_args.clear();
                 }
-            }
-            else if (!batchTimer.IsPending() && message_size > 0){
-                // No timer scheduled yet. This is the first message. Schedule the timer.
-                // Note that we will not send this message now. We will send it when the timer triggers.
-                // Event is scheduled with dummy values. Specifically, message_size = 0 to identify the trigger.
-                batchTimer = Simulator::Schedule(NanoSeconds(10),&ASTRASimNetwork::sim_send,
-                    this,nullptr,static_cast<uint64_t>(0),0,0,0,nullptr,nullptr,nullptr);
+            } else if (!batchTimer.IsPending() && message_size > 0) {
+                // No timer scheduled yet. This is the first message. Schedule
+                // the timer. Note that we will not send this message now. We
+                // will send it when the timer triggers. Event is scheduled with
+                // dummy values. Specifically, message_size = 0 to identify the
+                // trigger.
+                batchTimer = Simulator::Schedule(
+                    NanoSeconds(10), &ASTRASimNetwork::sim_send, this, nullptr,
+                    static_cast<uint64_t>(0), 0, 0, 0, nullptr, nullptr,
+                    nullptr);
                 // Add the flow to the batch.
-                send_flow_args.emplace_back(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
-            }
-            else if (batchTimer.IsPending()) {
-                // New flows entered while the timer is pending. Add them to the batch.
-                send_flow_args.emplace_back(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
-            }
-            else{
+                send_flow_args.emplace_back(src_id, dst_id, message_size,
+                                            msg_handler, fun_arg, tag);
+            } else if (batchTimer.IsPending()) {
+                // New flows entered while the timer is pending. Add them to the
+                // batch.
+                send_flow_args.emplace_back(src_id, dst_id, message_size,
+                                            msg_handler, fun_arg, tag);
+            } else {
                 std::cout << "Error in sim_send" << std::endl;
                 exit(0);
             }
-        }
-        else if(enableMpRDMA){
-            for(uint32_t split = 0; split < numMpRdmaQp-1; split++){
-                send_flow(src_id, dst_id, message_size/numMpRdmaQp, msg_handler, fun_arg, tag);
+        } else if (enableMpRDMA) {
+            for (uint32_t split = 0; split < numMpRdmaQp - 1; split++) {
+                send_flow(src_id, dst_id, message_size / numMpRdmaQp,
+                          msg_handler, fun_arg, tag);
             }
-            send_flow(src_id, dst_id, message_size/numMpRdmaQp + message_size%numMpRdmaQp, msg_handler, fun_arg, tag);
-        }
-        else{
+            send_flow(src_id, dst_id,
+                      message_size / numMpRdmaQp + message_size % numMpRdmaQp,
+                      msg_handler, fun_arg, tag);
+        } else {
             // Trigger ns3 to schedule RDMA QP event.
             send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
         }
@@ -275,8 +288,7 @@ void parse_args(int argc, char* argv[]) {
     cmd.AddValue("logical-topology-configuration",
                  "Logical topology configuration file",
                  logical_topology_configuration);
-    cmd.AddValue("logging-configuration",
-                 "Logging configuration file", 
+    cmd.AddValue("logging-configuration", "Logging configuration file",
                  logging_configuration);
 
     cmd.AddValue("num-queues-per-dim", "Number of queues per each dimension",
@@ -286,9 +298,15 @@ void parse_args(int argc, char* argv[]) {
     cmd.AddValue("rendezvous-protocol", "Whether to enable rendezvous protocol",
                  rendezvous_protocol);
     // STyGIANet
-    cmd.AddValue("enableEthereal", "Enable Ethereal, split flows dynamically to achieve optimal load balancing", enableEthereal);
-    cmd.AddValue("enableMpRDMA", "Enable MpRDMA, split flows by a constant number", enableEthereal);
-    cmd.AddValue("numMpRdmaQp", "split each flow by numMpRdmaQp times", numMpRdmaQp);
+    cmd.AddValue("enableEthereal",
+                 "Enable Ethereal, split flows dynamically to achieve optimal "
+                 "load balancing",
+                 enableEthereal);
+    cmd.AddValue("enableMpRDMA",
+                 "Enable MpRDMA, split flows by a constant number",
+                 enableEthereal);
+    cmd.AddValue("numMpRdmaQp", "split each flow by numMpRdmaQp times",
+                 numMpRdmaQp);
 
     cmd.Parse(argc, argv);
 }
@@ -312,12 +330,12 @@ int main(int argc, char* argv[]) {
 
     for (int npu_id = 0; npu_id < num_npus; npu_id++) {
         networks[npu_id] = new ASTRASimNetwork(npu_id);
-        
+
         // STyGIANet
         networks[npu_id]->enableEthereal = enableEthereal;
         networks[npu_id]->enableMpRDMA = enableMpRDMA;
         networks[npu_id]->numMpRdmaQp = numMpRdmaQp;
-        
+
         systems[npu_id] = new AstraSim::Sys(
             npu_id, workload_configuration, comm_group_configuration,
             system_configuration, mem, networks[npu_id], logical_dims,
