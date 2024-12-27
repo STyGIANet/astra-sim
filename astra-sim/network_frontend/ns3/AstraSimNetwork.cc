@@ -27,7 +27,11 @@ using json = nlohmann::json;
 
 class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
   public:
-    ASTRASimNetwork(int rank) : AstraNetworkAPI(rank) {}
+    ASTRASimNetwork(int rank) : AstraNetworkAPI(rank) {
+        enableEthereal = false;
+        enableMpRDMA = false;
+        numMpRdmaQp = 1;
+    }
 
     ~ASTRASimNetwork() {
         Simulator::Cancel(batchTimer);
@@ -37,6 +41,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     // This vector holds all the send calls issued by the system layer within a time window.
     using SendFlowArgs = std::tuple<int, int, uint64_t, void (*)(void*), void*, int>;
     std::vector<SendFlowArgs> send_flow_args;
+
+    bool enableEthereal;
+    bool enableMpRDMA;
+    uint32_t numMpRdmaQp;
 
     // STyGIANet
     EventId batchTimer;
@@ -88,47 +96,56 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         int src_id = rank;
 
         // STyGIANet
-        if (!batchTimer.IsPending() && message_size == 0){
-            // Assuming that sys layer would never call send with message size 0.
-            // So this is a signal by the timer to send all the flows in the batch.
-            if (send_flow_args.size() == 0) {
-                // nothing to send
-                std::cout << "Who scheduled a message with zero size?! How is the vector size zero too?" << std::endl;
-                exit(0);
+        if (enableEthereal){
+            if (!batchTimer.IsPending() && message_size == 0){
+                // Assuming that sys layer would never call send with message size 0.
+                // So this is a signal by the timer to send all the flows in the batch.
+                if (send_flow_args.size() == 0) {
+                    // nothing to send
+                    std::cout << "Who scheduled a message with zero size?! How is the vector size zero too?" << std::endl;
+                    exit(0);
+                }
+                else{
+                    // std::cout << "src " << rank << " send_flow_args.size(): " << send_flow_args.size() << std::endl;
+                    // Send all flows in this batch
+                    // This is the opportunity to do something with this batch of flows that go into the network.
+                    // ToDO
+                    for (auto& send_flow_arg : send_flow_args) {
+                        send_flow(std::get<0>(send_flow_arg), std::get<1>(send_flow_arg), std::get<2>(send_flow_arg), 
+                            std::get<3>(send_flow_arg), std::get<4>(send_flow_arg), std::get<5>(send_flow_arg));
+                    }
+                    // clear the batch
+                    send_flow_args.clear();
+                }
+            }
+            else if (!batchTimer.IsPending() && message_size > 0){
+                // No timer scheduled yet. This is the first message. Schedule the timer.
+                // Note that we will not send this message now. We will send it when the timer triggers.
+                // Event is scheduled with dummy values. Specifically, message_size = 0 to identify the trigger.
+                batchTimer = Simulator::Schedule(NanoSeconds(10),&ASTRASimNetwork::sim_send,
+                    this,nullptr,static_cast<uint64_t>(0),0,0,0,nullptr,nullptr,nullptr);
+                // Add the flow to the batch.
+                send_flow_args.emplace_back(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+            }
+            else if (batchTimer.IsPending()) {
+                // New flows entered while the timer is pending. Add them to the batch.
+                send_flow_args.emplace_back(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
             }
             else{
-                // std::cout << "src " << rank << " send_flow_args.size(): " << send_flow_args.size() << std::endl;
-                // Send all flows in this batch
-                // This is the opportunity to do something with this batch of flows that go into the network.
-                // ToDO
-                for (auto& send_flow_arg : send_flow_args) {
-                    send_flow(std::get<0>(send_flow_arg), std::get<1>(send_flow_arg), std::get<2>(send_flow_arg), 
-                        std::get<3>(send_flow_arg), std::get<4>(send_flow_arg), std::get<5>(send_flow_arg));
-                }
-                // clear the batch
-                send_flow_args.clear();
+                std::cout << "Error in sim_send" << std::endl;
+                exit(0);
             }
         }
-        else if (!batchTimer.IsPending() && message_size > 0){
-            // No timer scheduled yet. This is the first message. Schedule the timer.
-            // Note that we will not send this message now. We will send it when the timer triggers.
-            // Event is scheduled with dummy values. Specifically, message_size = 0 to identify the trigger.
-            batchTimer = Simulator::Schedule(NanoSeconds(10),&ASTRASimNetwork::sim_send,
-                this,nullptr,static_cast<uint64_t>(0),0,0,0,nullptr,nullptr,nullptr);
-            // Add the flow to the batch.
-            send_flow_args.emplace_back(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
-        }
-        else if (batchTimer.IsPending()) {
-            // New flows entered while the timer is pending. Add them to the batch.
-            send_flow_args.emplace_back(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+        else if(enableMpRDMA){
+            for(uint32_t split = 0; split < numMpRdmaQp-1; split++){
+                send_flow(src_id, dst_id, message_size/numMpRdmaQp, msg_handler, fun_arg, tag);
+            }
+            send_flow(src_id, dst_id, message_size/numMpRdmaQp + message_size%numMpRdmaQp, msg_handler, fun_arg, tag);
         }
         else{
-            std::cout << "Error in sim_send" << std::endl;
-            exit(0);
+            // Trigger ns3 to schedule RDMA QP event.
+            send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
         }
-
-        // Trigger ns3 to schedule RDMA QP event.
-        // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
         return 0;
     }
 
@@ -204,6 +221,9 @@ bool rendezvous_protocol = false;
 auto logical_dims = vector<int>();
 int num_npus = 1;
 auto queues_per_dim = vector<int>();
+bool enableEthereal = false;
+bool enableMpRDMA = false;
+bool numMpRdmaQp = 1;
 
 // TODO: Migrate to yaml
 void read_logical_topo_config(string network_configuration,
@@ -265,6 +285,10 @@ void parse_args(int argc, char* argv[]) {
     cmd.AddValue("injection-scale", "Injection scale", injection_scale);
     cmd.AddValue("rendezvous-protocol", "Whether to enable rendezvous protocol",
                  rendezvous_protocol);
+    // STyGIANet
+    cmd.AddValue("enableEthereal", "Enable Ethereal, split flows dynamically to achieve optimal load balancing", enableEthereal);
+    cmd.AddValue("enableMpRDMA", "Enable MpRDMA, split flows by a constant number", enableEthereal);
+    cmd.AddValue("numMpRdmaQp", "split each flow by numMpRdmaQp times", numMpRdmaQp);
 
     cmd.Parse(argc, argv);
 }
@@ -288,6 +312,12 @@ int main(int argc, char* argv[]) {
 
     for (int npu_id = 0; npu_id < num_npus; npu_id++) {
         networks[npu_id] = new ASTRASimNetwork(npu_id);
+        
+        // STyGIANet
+        networks[npu_id]->enableEthereal = enableEthereal;
+        networks[npu_id]->enableMpRDMA = enableMpRDMA;
+        networks[npu_id]->numMpRdmaQp = numMpRdmaQp;
+        
         systems[npu_id] = new AstraSim::Sys(
             npu_id, workload_configuration, comm_group_configuration,
             system_configuration, mem, networks[npu_id], logical_dims,
