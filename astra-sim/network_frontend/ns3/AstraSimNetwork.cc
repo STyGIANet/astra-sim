@@ -3,7 +3,6 @@
 #include "extern/remote_memory_backend/analytical/AnalyticalRemoteMemory.hh"
 #include <json/json.hpp>
 
-#include "astra-sim/common/Logging.hh"
 #include "entry.h"
 #include "ns3/applications-module.h"
 #include "ns3/core-module.h"
@@ -20,6 +19,7 @@
 #include <thread>
 #include <unistd.h>
 #include <vector>
+#include "astra-sim/common/Logging.hh"
 
 using namespace std;
 using namespace ns3;

@@ -26,4 +26,7 @@ PointerAlignment: Left
 # Braces
 InsertBraces: true
 AllowShortFunctionsOnASingleLine: Empty
----
+
+# Includes
+IncludeBlocks: Preserve
+SortIncludes: false
