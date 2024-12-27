@@ -31,15 +31,44 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         enableEthereal = false;
         enableMpRDMA = false;
         numMpRdmaQp = 1;
+
+        numUplinks = 0;
+        numTors = 0;
+        demandArray.clear();
     }
 
     ~ASTRASimNetwork() {
         Simulator::Cancel(batchTimer);
+        for (auto& row : demandArray) {
+            row.clear();
+            row.shrink_to_fit();
+        }
+        demandArray.clear();
+        demandArray.shrink_to_fit();
+    }
+
+    void set_topo_params(uint32_t uplinks, uint32_t tors) {
+        // Reset if anything was already allocated perhaps due to
+        // misconfiguration
+        for (auto& row : demandArray) {
+            row.clear();
+            row.shrink_to_fit();
+        }
+        demandArray.clear();
+        demandArray.shrink_to_fit();
+
+        // Set the new values
+        numUplinks = uplinks;
+        numTors = tors;
+        // Each destination ToR corresponds to a row and each uplink corresponds
+        // to a column. This choice of dimensions is because we typically want
+        // to iterate per-destination ToR and assign demand to uplinks.
+        demandArray.resize(numTors, std::vector<uint64_t>(numUplinks, 0));
     }
 
     // STyGIANet
-    // This vector holds all the send calls issued by the system layer within a
-    // time window.
+    // This vector holds all the send calls issued by the system layer
+    // within a time window.
     using SendFlowArgs =
         std::tuple<int, int, uint64_t, void (*)(void*), void*, int>;
     std::vector<SendFlowArgs> send_flow_args;
@@ -217,6 +246,19 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         }
         return 0;
     }
+
+  private:
+    // This 2D array has each row corresponding to a destination ToR and each
+    // column corresponding to an uplink. The value at each cell is the demand
+    // assigned to an uplink and the destination ToR switch of the demand.
+    // Note: This is all a local perspective at each end-host.
+    std::vector<std::vector<uint64_t>> demandArray;
+    // numUplinks variable is interpreted as follows. Configure it carefully.
+    // For 2-tier leaf-spine topology: uplinks = number of spine switches.
+    // For 3-tier FatTree topology: uplinks = number of core switches.
+    // We assume no oversubscription between tor/agg and agg/core layers.
+    uint32_t numUplinks;
+    uint32_t numTors;
 };
 
 // Command line arguments and default values.
