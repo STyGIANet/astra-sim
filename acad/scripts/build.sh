@@ -11,7 +11,7 @@ SCRIPT_DIR=$(dirname "$(realpath $0)")
 ASTRA_SIM_DIR="${SCRIPT_DIR:?}"/../../astra-sim
 NS3_DIR="${SCRIPT_DIR:?}"/../../extern/network_backend/ns-3
 # Inputs - change as necessary.
-WORKLOAD=$(realpath "${SCRIPT_DIR:?}"/../et-workloads/AllReduce) # use chakra
+WORKLOAD=$(realpath "${SCRIPT_DIR:?}"/../et-workloads/AllReduce-64-leaf-spine) # use chakra
 SYSTEM=$(realpath "${SCRIPT_DIR:?}"/../system-configs/system.json)
 MEMORY=$(realpath "${SCRIPT_DIR:?}"/../memory-configs/remote_memory.json)
 LOGICAL_TOPOLOGY=$(realpath "${SCRIPT_DIR:?}"/../logical-topo-configs/logical-topo.json)
@@ -51,7 +51,7 @@ function debug {
     cd "${NS3_DIR}"
     ./ns3 configure --enable-mpi --build-profile debug
     ./ns3 build AstraSimNetwork -j 12 -v
-    cd "${NS3_DIR}/build/scratch"
+    cd ${ASTRA_SIM_DIR}/..
     gdb --args "${NS3_DIR}/build/scratch/ns3.42-AstraSimNetwork-debug" \
         --workload-configuration=${WORKLOAD} \
         --system-configuration=${SYSTEM} \
