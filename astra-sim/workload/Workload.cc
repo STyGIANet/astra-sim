@@ -246,13 +246,14 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
         }
     } else {
         // involved_dim does not exist in ETFeeder.
-        // Assume involved_dim = [1,1,1,1,1] which we could simulate 5-Dimension.
-	// Could use Process Group to build involved_dim later. 
-	// Once process group is implemented, you should get
+        // Assume involved_dim = [1,1,1,1,1] which we could simulate
+        // 5-Dimension. Could use Process Group to build involved_dim later.
+        // Once process group is implemented, you should get
         // that with node->pg_name()
-	
-	for(int i = 0; i < 4; i++)
+
+        for (int i = 0; i < 4; i++) {
             involved_dim.push_back(true);
+        }
     }
 
     if (!node->is_cpu_op() &&
