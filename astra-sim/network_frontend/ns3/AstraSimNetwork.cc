@@ -20,6 +20,9 @@
 #include <unistd.h>
 #include <vector>
 #include "astra-sim/common/Logging.hh"
+#include <tuple>
+#include <algorithm>
+#include <random>
 
 using namespace std;
 using namespace ns3;
@@ -28,12 +31,16 @@ using json = nlohmann::json;
 class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
   public:
     ASTRASimNetwork(int rank) : AstraNetworkAPI(rank) {
-        enableEthereal = false;
-        enableMpRDMA = false;
+        lb_mode = appLoadBalancing::UNSPECIFIED;
         numMpRdmaQp = 1;
+        failedPathResetTimeOut = 0;  // 0 by default. OFF
 
-        numUplinks = 0;
-        numTors = 0;
+        t1Links = 0;
+        t2Links = 0;
+        nTorsPerPod = 0;
+        nTors = 0;
+
+        nRanks = 0;
         demandArray.clear();
     }
 
@@ -45,9 +52,68 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         }
         demandArray.clear();
         demandArray.shrink_to_fit();
+
+        for (auto& row : pathMatrix) {
+            row.clear();
+            row.shrink_to_fit();
+        }
+        pathMatrix.clear();
+        pathMatrix.shrink_to_fit();
+
+        numFailedPaths.clear();
+        numFailedPaths.shrink_to_fit();
+
+        send_flow_args.clear();
     }
 
-    void set_topo_params(uint32_t uplinks, uint32_t tors) {
+    BackendType get_backend_type() override {
+        return BackendType::NS3;
+    }
+
+    bool etherealEnabled() {
+        return lb_mode == appLoadBalancing::ETHEREAL;
+    }
+
+    void set_n_ranks(int ranks) {
+        nRanks = ranks;
+    }
+
+    int get_n_ranks() {
+        return nRanks;
+    }
+
+    void setLinkFailure(uint32_t uplink, uint32_t dst) {
+        uint32_t nPerTor = (nRanks / nTors);
+        uint32_t dst_tor = dst / nPerTor;
+        NS_ASSERT_MSG(uplink < pathMatrix[dst_tor].size(),
+                      "Invalid uplink index");
+        if (pathMatrix[dst_tor][uplink].IsPending()) {
+            Simulator::Cancel(pathMatrix[dst_tor][uplink]);
+        } else {
+            numFailedPaths[dst_tor]++;
+        }
+        pathMatrix[dst_tor][uplink] = Simulator::Schedule(
+            NanoSeconds(failedPathResetTimeOut),
+            &ASTRASimNetwork::resetLinkFailure, this, uplink, dst);
+    }
+
+    void resetLinkFailure(uint32_t uplink, uint32_t dst) {
+        uint32_t nPerTor = (nRanks / nTors);
+        uint32_t dst_tor = dst / nPerTor;
+        NS_ASSERT_MSG(uplink < pathMatrix[dst_tor].size(),
+                      "Invalid uplink index");
+        if (numFailedPaths[dst_tor] > 0) {
+            numFailedPaths[dst_tor]--;
+        }
+        if (pathMatrix[dst_tor][uplink].IsPending()) {
+            Simulator::Cancel(pathMatrix[dst_tor][uplink]);
+        }
+    }
+
+    void set_topo_params(uint32_t t1l,
+                         uint32_t t2l,
+                         uint32_t podTors,
+                         uint32_t allTors) {
         // Reset if anything was already allocated perhaps due to
         // misconfiguration
         for (auto& row : demandArray) {
@@ -57,13 +123,46 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         demandArray.clear();
         demandArray.shrink_to_fit();
 
+        for (auto& row : pathMatrix) {
+            row.clear();
+            row.shrink_to_fit();
+        }
+        pathMatrix.clear();
+        pathMatrix.shrink_to_fit();
+
+        numFailedPaths.clear();
+        numFailedPaths.shrink_to_fit();
+
         // Set the new values
-        numUplinks = uplinks;
-        numTors = tors;
-        // Each destination ToR corresponds to a row and each uplink corresponds
-        // to a column. This choice of dimensions is because we typically want
-        // to iterate per-destination ToR and assign demand to uplinks.
-        demandArray.resize(numTors, std::vector<uint64_t>(numUplinks, 0));
+        t1Links = t1l;
+        t2Links = t2l;
+        nTorsPerPod = podTors;
+        nTors = allTors;
+
+        // demandArray: Each destination ToR corresponds to a row and each
+        // uplink corresponds to a column. This choice of dimensions is because
+        // we typically want to iterate per-destination ToR and assign demand to
+        // uplinks. pathMatrix indicates failures corresponding to a destination
+        // tor (row) on a particular uplink (column).
+        demandArray.resize(nTors);
+        pathMatrix.resize(nTors);
+        for (uint32_t dst_tor = 0; dst_tor < nTors; dst_tor++) {
+            uint32_t nPerTor = (nRanks / nTors);
+            uint32_t myRackId = rank / nPerTor;
+
+            if ((dst_tor / nTorsPerPod) == (myRackId / nTorsPerPod)) {
+                demandArray[dst_tor].resize(t1Links, 0);
+                pathMatrix[dst_tor].resize(t1Links, EventId());
+            } else {
+                demandArray[dst_tor].resize(t2Links, 0);
+                pathMatrix[dst_tor].resize(t2Links, EventId());
+            }
+        }
+
+        numFailedPaths.resize(nTors, 0);
+    }
+    bool isRackLocal(uint32_t dst) {
+        return (dst / (nRanks / nTors)) == (rank / (nRanks / nTors));
     }
 
     // STyGIANet
@@ -71,11 +170,6 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     // within a time window.
     using SendFlowArgs =
         std::tuple<int, int, uint64_t, void (*)(void*), void*, int>;
-    std::vector<SendFlowArgs> send_flow_args;
-
-    bool enableEthereal;
-    bool enableMpRDMA;
-    uint32_t numMpRdmaQp;
 
     // STyGIANet
     EventId batchTimer;
@@ -116,6 +210,13 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         return;
     }
 
+    int gcd(int a, int b) {
+        if (b == 0) {
+            return a;
+        }
+        return gcd(b, a % b);
+    }
+
     virtual int sim_send(void* buffer,
                          uint64_t message_size,
                          int type,
@@ -127,7 +228,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         int src_id = rank;
 
         // STyGIANet
-        if (enableEthereal) {
+        if (lb_mode == appLoadBalancing::ETHEREAL) {
+            // std::cout << "Ethereal enabled" << std::endl;
             if (!batchTimer.IsPending() && message_size == 0) {
                 // Assuming that sys layer would never call send with message
                 // size 0. So this is a signal by the timer to send all the
@@ -139,44 +241,174 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                               << std::endl;
                     exit(0);
                 } else {
-                    // std::cout << "src " << rank << " send_flow_args.size(): "
-                    // << send_flow_args.size() << std::endl; Send all flows in
-                    // this batch This is the opportunity to do something with
-                    // this batch of flows that go into the network. ToDO
-                    for (auto& send_flow_arg : send_flow_args) {
-                        send_flow(std::get<0>(send_flow_arg),
-                                  std::get<1>(send_flow_arg),
-                                  std::get<2>(send_flow_arg),
-                                  std::get<3>(send_flow_arg),
-                                  std::get<4>(send_flow_arg),
-                                  std::get<5>(send_flow_arg));
+                    // Send all flows in this batch. This is the opportunity to
+                    // do something with this batch of flows that go into the
+                    // network.
+
+                    // Ethereal
+
+                    // Randomize the destinations to avoid synchronization
+                    std::vector<int> keys;
+                    for (const auto& [dst, flow_vec] : send_flow_args) {
+                        keys.push_back(dst);
+                    }
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    std::shuffle(keys.begin(), keys.end(), gen);
+
+                    // Load balance
+                    for (int dst : keys) {
+                        auto& flow_vec = send_flow_args[dst];
+                        // Also randomize the destinations within each
+                        // destination ToR to avoid synchronization
+                        std::shuffle(flow_vec.begin(), flow_vec.end(), gen);
+                        uint32_t numFlows = flow_vec.size();
+                        // std::cout << "dst " << dst << " numFlows " <<
+                        // numFlows << std::endl;
+                        if (numFlows > 0) {
+                            std::vector<int> goodPaths;
+                            for (uint32_t p = 0; p < pathMatrix[dst].size();
+                                 p++) {
+                                if (!pathMatrix[dst][p].IsPending()) {
+                                    goodPaths.emplace_back(p);
+                                }
+                            }
+                            NS_ASSERT_MSG(goodPaths.size() ==
+                                              pathMatrix[dst].size() -
+                                                  numFailedPaths[dst],
+                                          "Good paths size mismatch!");
+                            uint32_t path = 0;
+                            uint32_t s = goodPaths.size();
+                            uint32_t r = numFlows % s;
+                            // Send these flows as usual
+                            for (int i = 0; i < numFlows - r; i++) {
+                                NS_ASSERT_MSG(std::get<2>(flow_vec[i]) ==
+                                                  std::get<2>(flow_vec[0]),
+                                              "Flow size assumption failed!");
+                                // ToDO: add dst_port parameter for source
+                                // routing
+                                uint16_t t1Path;
+                                uint16_t t2Path;
+                                if (t2Links == 0) {
+                                    t1Path = path % goodPaths.size();
+                                    t1Path = goodPaths[t1Path];
+                                    t2Path = 0;
+                                } else {
+                                    uint32_t coreSwitch =
+                                        path % goodPaths.size();
+                                    coreSwitch = goodPaths[coreSwitch];
+                                    // Assume 1:1 oversubscription
+                                    // Each aggregation switch connect to every
+                                    // ToR switch in the south direction. With
+                                    // 1:1 oversubscription, each aggregation
+                                    // switch must connect to the same number of
+                                    // core switches in the north direction.
+                                    t1Path = coreSwitch / nTorsPerPod;
+                                    t2Path = coreSwitch % nTorsPerPod;
+                                }
+                                int myPath =
+                                    (static_cast<int>(t2Path) << 16) | t1Path;
+                                send_flow(std::get<0>(flow_vec[i]),
+                                          std::get<1>(flow_vec[i]),
+                                          std::get<2>(flow_vec[i]),
+                                          std::get<3>(flow_vec[i]),
+                                          std::get<4>(flow_vec[i]),
+                                          std::get<5>(flow_vec[i]), myPath);
+                                path++;
+                            }
+                            if (r > 0) {
+                                // Split these last few flows in order to
+                                // achieve optimal load balancing
+                                uint32_t g = gcd(r, s);
+                                uint64_t numSplit = s / g;
+                                uint64_t flowSize =
+                                    std::get<2>(flow_vec[0]) / numSplit;
+                                uint64_t residualFlowSize =
+                                    std::get<2>(flow_vec[0]) % numSplit;
+                                for (int i = 0; i < r; i++) {
+                                    NS_ASSERT_MSG(
+                                        std::get<2>(flow_vec[numFlows - 1]) ==
+                                            std::get<2>(flow_vec[0]),
+                                        "Flow size assumption failed!");
+                                    for (int j = 0; j < numSplit; j++) {
+                                        uint16_t t1Path;
+                                        uint16_t t2Path;
+                                        if (t2Links == 0) {
+                                            t1Path = path % goodPaths.size();
+                                            t1Path = goodPaths[t1Path];
+                                            t2Path = 0;
+                                        } else {
+                                            uint32_t coreSwitch =
+                                                path % goodPaths.size();
+                                            coreSwitch = goodPaths[coreSwitch];
+                                            // Assume 1:1 oversubscription
+                                            // Each aggregation switch connect
+                                            // to every ToR switch in the south
+                                            // direction. With 1:1
+                                            // oversubscription, each
+                                            // aggregation switch must connect
+                                            // to the same number of core
+                                            // switches in the north direction.
+                                            t1Path = coreSwitch / nTorsPerPod;
+                                            t2Path = coreSwitch % nTorsPerPod;
+                                        }
+                                        int myPath =
+                                            (static_cast<int>(t2Path) << 16) |
+                                            t1Path;
+                                        send_flow(
+                                            std::get<0>(flow_vec[numFlows - 1]),
+                                            std::get<1>(flow_vec[numFlows - 1]),
+                                            flowSize + residualFlowSize *
+                                                           (j == numSplit - 1),
+                                            std::get<3>(flow_vec[numFlows - 1]),
+                                            std::get<4>(flow_vec[numFlows - 1]),
+                                            std::get<5>(flow_vec[numFlows - 1]),
+                                            myPath);
+                                        path++;
+                                    }
+                                }
+                            }
+                            flow_vec.clear();
+                        }
                     }
                     // clear the batch
                     send_flow_args.clear();
                 }
-            } else if (!batchTimer.IsPending() && message_size > 0) {
-                // No timer scheduled yet. This is the first message. Schedule
-                // the timer. Note that we will not send this message now. We
-                // will send it when the timer triggers. Event is scheduled with
-                // dummy values. Specifically, message_size = 0 to identify the
-                // trigger.
-                batchTimer = Simulator::Schedule(
-                    NanoSeconds(10), &ASTRASimNetwork::sim_send, this, nullptr,
-                    static_cast<uint64_t>(0), 0, 0, 0, nullptr, nullptr,
-                    nullptr);
-                // Add the flow to the batch.
-                send_flow_args.emplace_back(src_id, dst_id, message_size,
-                                            msg_handler, fun_arg, tag);
-            } else if (batchTimer.IsPending()) {
-                // New flows entered while the timer is pending. Add them to the
-                // batch.
-                send_flow_args.emplace_back(src_id, dst_id, message_size,
-                                            msg_handler, fun_arg, tag);
+            } else if (message_size > 0) {
+                // ToDO: Find a better way to check rack locality.
+                uint32_t nPerTor = (nRanks / nTors);
+                bool rackLocal;
+                ((src_id / nPerTor) == (dst_id / nPerTor)) ? rackLocal = true
+                                                           : rackLocal = false;
+                if (!rackLocal) {
+                    // No timer scheduled yet. This is the first message.
+                    // Schedule the timer. Note that we will not send this
+                    // message now. We will send it when the timer triggers.
+                    // Event is scheduled with dummy values. Specifically,
+                    // message_size = 0 to identify the trigger.
+                    if (!batchTimer.IsPending()) {
+                        batchTimer = Simulator::Schedule(
+                            NanoSeconds(20), &ASTRASimNetwork::sim_send, this,
+                            nullptr, static_cast<uint64_t>(0), 0, 0, 0, nullptr,
+                            nullptr, nullptr);
+                    }
+                    // Add the flow to the batch.
+                    send_flow_args[dst_id / nPerTor].emplace_back(
+                        src_id, dst_id, message_size, msg_handler, fun_arg,
+                        tag);
+                } else {
+                    // Rack Local flows should be sent immediately.
+                    // The following logic is just for simplicilty, it works
+                    // based on how we generate FatTree topologies currently.
+                    send_flow(src_id, dst_id, message_size, msg_handler,
+                              fun_arg, tag);
+                }
             } else {
                 std::cout << "Error in sim_send" << std::endl;
                 exit(0);
             }
-        } else if (enableMpRDMA) {
+        } else if (lb_mode == appLoadBalancing::MP_RDMA) {
+            // std::cout << "MpRDMA enabled" << std::endl;
             for (uint32_t split = 0; split < numMpRdmaQp - 1; split++) {
                 send_flow(src_id, dst_id, message_size / numMpRdmaQp,
                           msg_handler, fun_arg, tag);
@@ -185,6 +417,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                       message_size / numMpRdmaQp + message_size % numMpRdmaQp,
                       msg_handler, fun_arg, tag);
         } else {
+            // std::cout << "Default enabled" << std::endl;
             // Trigger ns3 to schedule RDMA QP event.
             send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
         }
@@ -217,8 +450,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                 recv_event.callHandler();
             } else if (received_msg_bytes > message_size) {
                 // 1-2) The node received more than expected.
-                // Do trigger the callback handler for this message, but wait
-                // for Sys layer to call sim_recv for more messages.
+                // Do trigger the callback handler for this message, but
+                // wait for Sys layer to call sim_recv for more messages.
                 received_msg_standby_hash[recv_event_key] =
                     received_msg_bytes - message_size;
                 recv_event.callHandler();
@@ -248,17 +481,36 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     }
 
   private:
-    // This 2D array has each row corresponding to a destination ToR and each
-    // column corresponding to an uplink. The value at each cell is the demand
-    // assigned to an uplink and the destination ToR switch of the demand.
-    // Note: This is all a local perspective at each end-host.
+    // This 2D array has each row corresponding to a destination ToR and
+    // each column corresponding to an uplink. The value at each cell is the
+    // demand assigned to an uplink and the destination ToR switch of the
+    // demand. Note: This is all a local perspective at each end-host.
     std::vector<std::vector<uint64_t>> demandArray;
-    // numUplinks variable is interpreted as follows. Configure it carefully.
-    // For 2-tier leaf-spine topology: uplinks = number of spine switches.
-    // For 3-tier FatTree topology: uplinks = number of core switches.
+
+    std::vector<std::vector<EventId>> pathMatrix;
+
+    std::vector<uint32_t> numFailedPaths;
+
+    // Topology variables are interpreted as follows.
+
+    // For 2-tier leaf-spine topology: t1Links = number of spine switches,
+    // t2Links = 0, nTorsPerPod = nTors = total number of ToR switches.
+
+    // For 3-tier FatTree topology: t1Links = number of uplinks of a ToR switch,
+    // t2Links = number of uplinks of an aggregation switch. nTorsPerPod =
+    // number of ToR switches in a single pod. nTors = total number of ToR
+    // switches.
+
     // We assume no oversubscription between tor/agg and agg/core layers.
-    uint32_t numUplinks;
-    uint32_t numTors;
+    uint32_t t1Links;
+    uint32_t t2Links;
+    uint32_t nTorsPerPod;
+    uint32_t nTors;
+
+    // For each destination, we maintain a vector of send calls.
+    std::unordered_map<int, std::vector<SendFlowArgs>> send_flow_args;
+
+    int nRanks;
 };
 
 // Command line arguments and default values.
@@ -276,9 +528,6 @@ bool rendezvous_protocol = false;
 auto logical_dims = vector<int>();
 int num_npus = 1;
 auto queues_per_dim = vector<int>();
-bool enableEthereal = false;
-bool enableMpRDMA = false;
-bool numMpRdmaQp = 1;
 
 // TODO: Migrate to yaml
 void read_logical_topo_config(string network_configuration,
@@ -339,16 +588,6 @@ void parse_args(int argc, char* argv[]) {
     cmd.AddValue("injection-scale", "Injection scale", injection_scale);
     cmd.AddValue("rendezvous-protocol", "Whether to enable rendezvous protocol",
                  rendezvous_protocol);
-    // STyGIANet
-    cmd.AddValue("enableEthereal",
-                 "Enable Ethereal, split flows dynamically to achieve optimal "
-                 "load balancing",
-                 enableEthereal);
-    cmd.AddValue("enableMpRDMA",
-                 "Enable MpRDMA, split flows by a constant number",
-                 enableEthereal);
-    cmd.AddValue("numMpRdmaQp", "split each flow by numMpRdmaQp times",
-                 numMpRdmaQp);
 
     cmd.Parse(argc, argv);
 }
@@ -372,16 +611,15 @@ int main(int argc, char* argv[]) {
 
     for (int npu_id = 0; npu_id < num_npus; npu_id++) {
         networks[npu_id] = new ASTRASimNetwork(npu_id);
-
-        // STyGIANet
-        networks[npu_id]->enableEthereal = enableEthereal;
-        networks[npu_id]->enableMpRDMA = enableMpRDMA;
-        networks[npu_id]->numMpRdmaQp = numMpRdmaQp;
-
         systems[npu_id] = new AstraSim::Sys(
             npu_id, workload_configuration, comm_group_configuration,
             system_configuration, mem, networks[npu_id], logical_dims,
             queues_per_dim, injection_scale, comm_scale, rendezvous_protocol);
+
+        // STyGIANet
+        if (networks[npu_id]->etherealEnabled()) {
+            networks[npu_id]->set_n_ranks(num_npus);
+        }
     }
 
     // Initialize ns3 simulation.
@@ -392,6 +630,31 @@ int main(int argc, char* argv[]) {
 
     // Tell workload layer to schedule first events.
     for (int i = 0; i < num_npus; i++) {
+        // STyGIANet
+        // Set topology parameters for Ethereal if enabled.
+        if (networks[i]->etherealEnabled()) {
+            NS_ASSERT_MSG(t1l > 0, "Number of t1 uplinks is not set! This "
+                                   "should be set in the topology file.");
+            NS_ASSERT_MSG(podTors > 0, "Number of ToRs is not set! This should "
+                                       "be set in the topology file.");
+            NS_ASSERT_MSG(allTors > 0, "Number of ToRs is not set! This should "
+                                       "be set in the topology file.");
+            NS_ASSERT_MSG(networks[i]->get_n_ranks() > 0,
+                          "ranks = 0; Number of ranks not set!");
+            networks[i]->set_topo_params(t1l, t2l, podTors, allTors);
+            n.Get(i)
+                ->GetObject<RdmaDriver>()
+                ->m_rdma->TraceConnectWithoutContext(
+                    "linkFailure",
+                    MakeCallback(&ASTRASimNetwork::setLinkFailure,
+                                 networks[i]));
+            n.Get(i)
+                ->GetObject<RdmaDriver>()
+                ->m_rdma->TraceConnectWithoutContext(
+                    "resetLinkFailure",
+                    MakeCallback(&ASTRASimNetwork::resetLinkFailure,
+                                 networks[i]));
+        }
         systems[i]->workload->fire();
     }
 
@@ -399,5 +662,6 @@ int main(int argc, char* argv[]) {
     Simulator::Run();
     Simulator::Stop(Seconds(2000000000));
     Simulator::Destroy();
+    std::cout << "Simulation finished!" << std::endl;
     return 0;
 }

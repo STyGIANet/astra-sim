@@ -14,6 +14,8 @@ class AstraNetworkAPI {
   public:
     enum class BackendType { NotSpecified = 0, Garnet, NS3, Analytical };
 
+    enum class appLoadBalancing { UNSPECIFIED = 0, ETHEREAL, MP_RDMA };
+
     AstraNetworkAPI(int rank) : rank(rank) {};
     virtual ~AstraNetworkAPI() {};
 
@@ -65,7 +67,29 @@ class AstraNetworkAPI {
         return -1;
     };
 
+    void setAppLoadBalancing(appLoadBalancing mode) {
+        lb_mode = mode;
+    }
+
+    appLoadBalancing getAppLoadBalancing() {
+        return lb_mode;
+    }
+
+    void setMpRdmaQp(int numQp) {
+        numMpRdmaQp = numQp;
+    }
+
+    void setFailedPathTimeoutNS(uint64_t ns) {
+        failedPathResetTimeOut = ns;
+    }
+
     int rank;
+
+    appLoadBalancing lb_mode;
+    // MPRDMA, split each flow to numMpRdmaQp flows
+    uint32_t numMpRdmaQp;
+    // Time after which a failed path is reset to good path
+    uint64_t failedPathResetTimeOut;  // in nanoseconds
 };
 
 }  // namespace AstraSim

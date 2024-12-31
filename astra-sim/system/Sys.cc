@@ -496,6 +496,36 @@ bool Sys::initialize_sys(string name) {
         }
     }
 
+    if (j.contains("app-load-balance")) {
+        string inp_app_load_balance = j["app-load-balance"];
+        if (inp_app_load_balance == "ethereal") {
+            comm_NI->setAppLoadBalancing(
+                AstraNetworkAPI::appLoadBalancing::ETHEREAL);
+        } else if (inp_app_load_balance == "mp-rdma") {
+            comm_NI->setAppLoadBalancing(
+                AstraNetworkAPI::appLoadBalancing::MP_RDMA);
+            if (j.contains("mp-rdma-qp")) {
+                comm_NI->setMpRdmaQp(int(j["mp-rdma-qp"]));
+                if (int(j["mp-rdma-qp"]) < 1) {
+                    sys_panic("mp-rdma-qp should be greater than 0");
+                }
+            } else {
+                sys_panic("mp-rdma is enabled but mp-rdma-qp is not set in sys "
+                          "input file");
+            }
+        } else {
+            sys_panic("unknown value for app load balancing in sys input file");
+        }
+        if (j.contains("failed-path-timeout-ns")) {
+            comm_NI->setFailedPathTimeoutNS(j["failed-path-timeout-ns"]);
+        } else {
+            // No failure detection
+            // Even if a failure is notifed, the node simply resets it to a good
+            // path immediately.
+            comm_NI->setFailedPathTimeoutNS(0);
+        }
+    }
+
     inFile.close();
     return true;
 }

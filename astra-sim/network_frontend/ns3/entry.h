@@ -149,6 +149,38 @@ void send_flow(int src_id, int dst, int maxPacketCount,
   appCon.Start(Time(0));
 }
 
+// send_flow commands the ns3 simulator to schedule a RDMA message to be sent
+// between two pair of nodes. send_flow is triggered by sim_send.
+// This overloaded function, optionally takes a dst_port parameter.
+// We will use this value to do source routing.
+// ToDO: Find a better solution for attaching source routing info.
+void send_flow(int src_id, int dst, int maxPacketCount,
+               void (*msg_handler)(void *fun_arg), void *fun_arg, int tag, int dst_port) {
+  // Get a new port number.
+  uint32_t port = portNumber[src_id][dst]++;
+  sender_src_port_map[make_pair(port, make_pair(src_id, dst))] = tag;
+  int pg = 3, dport = dst_port;
+  flow_input.idx++;
+
+  // Create a MsgEvent instance and register callback function.
+  MsgEvent send_event =
+      MsgEvent(src_id, dst, 0, maxPacketCount, fun_arg, msg_handler);
+  pair<MsgEventKey, int> send_event_key =
+      make_pair(make_pair(tag, make_pair(send_event.src_id, send_event.dst_id)),port) ;
+  sim_send_waiting_hash[send_event_key] = send_event;
+
+  // Create a queue pair and schedule within the ns3 simulator.
+  RdmaClientHelper clientHelper(
+      pg, serverAddress[src_id], serverAddress[dst], port, dport,
+      maxPacketCount,
+      has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)])
+              : 0,
+      global_t == 1 ? maxRtt : pairRtt[src_id][dst], msg_handler, fun_arg, tag,
+      src_id, dst);
+  ApplicationContainer appCon = clientHelper.Install(n.Get(src_id));
+  appCon.Start(Time(0));
+}
+
 // notify_receiver_receive_data looks at whether the System layer has issued
 // sim_recv for this message. If the system layer is waiting for this message,
 // call the callback handler for the MsgEvent. If the system layer is not *yet*
