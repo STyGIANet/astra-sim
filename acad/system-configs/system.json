@@ -4,7 +4,7 @@
     "active-chunks-per-dimension": 1,
     "preferred-dataset-splits": 1,
     "all-reduce-implementation": [
-        "direct"
+        "ring"
     ],
     "all-gather-implementation": [
         "ring"
@@ -18,6 +18,8 @@
     "collective-optimization": "baseline",
     "local-mem-bw": 1600,
     "boost-mode": 0,
-    "failed-path-timeout-ns": 1000000,
+    "app-load-balance": "none",
+    "qp-randomize": 0,
+    "failed-path-timeout-ns": 100000000,
     "mp-rdma-qp": 4
 }

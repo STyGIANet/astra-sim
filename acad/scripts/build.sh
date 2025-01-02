@@ -11,10 +11,10 @@ SCRIPT_DIR=$(dirname "$(realpath $0)")
 ASTRA_SIM_DIR="${SCRIPT_DIR:?}"/../../astra-sim
 NS3_DIR="${SCRIPT_DIR:?}"/../../extern/network_backend/ns-3
 # Inputs - change as necessary.
-WORKLOAD=$(realpath "${SCRIPT_DIR:?}"/../et-workloads/AllReduce-64-leaf-spine) # use chakra
+WORKLOAD=$(realpath "${SCRIPT_DIR:?}"/../et-workloads/AllReduce-256-leaf-spine) # use chakra
 SYSTEM=$(realpath "${SCRIPT_DIR:?}"/../system-configs/system.json)
 MEMORY=$(realpath "${SCRIPT_DIR:?}"/../memory-configs/remote_memory.json)
-LOGICAL_TOPOLOGY=$(realpath "${SCRIPT_DIR:?}"/../logical-topo-configs/logical-topo.json)
+LOGICAL_TOPOLOGY=$(realpath "${SCRIPT_DIR:?}"/../logical-topo-configs/logical-topo-256.json)
 # Note that ONLY this file is relative to NS3_DIR/simulation
 NETWORK=$(realpath "${SCRIPT_DIR:?}"/../network-configs/config.txt)
 # Functions
