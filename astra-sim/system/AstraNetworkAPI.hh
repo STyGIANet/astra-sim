@@ -83,6 +83,10 @@ class AstraNetworkAPI {
         failedPathResetTimeOut = ns;
     }
 
+    void setRandomize(uint32_t set){
+        randomize = set;
+    }
+
     int rank;
 
     appLoadBalancing lb_mode;
@@ -90,6 +94,7 @@ class AstraNetworkAPI {
     uint32_t numMpRdmaQp;
     // Time after which a failed path is reset to good path
     uint64_t failedPathResetTimeOut;  // in nanoseconds
+    uint32_t randomize;
 };
 
 }  // namespace AstraSim

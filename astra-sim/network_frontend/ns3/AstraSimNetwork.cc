@@ -23,6 +23,7 @@
 #include <tuple>
 #include <algorithm>
 #include <random>
+#include "ns3/random-variable-stream.h"
 
 using namespace std;
 using namespace ns3;
@@ -33,7 +34,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     ASTRASimNetwork(int rank) : AstraNetworkAPI(rank) {
         lb_mode = appLoadBalancing::UNSPECIFIED;
         numMpRdmaQp = 1;
-        failedPathResetTimeOut = 0;  // 0 by default. OFF
+        failedPathResetTimeOut = 0;  // OFF by default
+        randomize = 0; // OFF by default
 
         t1Links = 0;
         t2Links = 0;
@@ -42,6 +44,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
 
         nRanks = 0;
         demandArray.clear();
+        m_rand = CreateObject<UniformRandomVariable>();
     }
 
     ~ASTRASimNetwork() {
@@ -88,7 +91,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         NS_ASSERT_MSG(uplink < pathMatrix[dst_tor].size(),
                       "Invalid uplink index");
         if (pathMatrix[dst_tor][uplink].IsPending()) {
-            Simulator::Cancel(pathMatrix[dst_tor][uplink]);
+            pathMatrix[dst_tor][uplink].Remove();
         } else {
             numFailedPaths[dst_tor]++;
         }
@@ -106,7 +109,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
             numFailedPaths[dst_tor]--;
         }
         if (pathMatrix[dst_tor][uplink].IsPending()) {
-            Simulator::Cancel(pathMatrix[dst_tor][uplink]);
+            pathMatrix[dst_tor][uplink].Remove();
         }
     }
 
@@ -261,10 +264,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                         auto& flow_vec = send_flow_args[dst];
                         // Also randomize the destinations within each
                         // destination ToR to avoid synchronization
-                        std::shuffle(flow_vec.begin(), flow_vec.end(), gen);
+                        if (randomize){
+                            std::shuffle(flow_vec.begin(), flow_vec.end(), gen);
+                        }
                         uint32_t numFlows = flow_vec.size();
-                        // std::cout << "dst " << dst << " numFlows " <<
-                        // numFlows << std::endl;
                         if (numFlows > 0) {
                             std::vector<int> goodPaths;
                             for (uint32_t p = 0; p < pathMatrix[dst].size();
@@ -273,12 +276,15 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                     goodPaths.emplace_back(p);
                                 }
                             }
+                            if (randomize){
+                                std::shuffle(goodPaths.begin(), goodPaths.end(), gen);
+                            }
                             NS_ASSERT_MSG(goodPaths.size() ==
                                               pathMatrix[dst].size() -
                                                   numFailedPaths[dst],
                                           "Good paths size mismatch!");
-                            uint32_t path = 0;
                             uint32_t s = goodPaths.size();
+                            uint32_t path = 0;
                             uint32_t r = numFlows % s;
                             // Send these flows as usual
                             for (int i = 0; i < numFlows - r; i++) {
@@ -294,7 +300,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                     t1Path = goodPaths[t1Path];
                                     t2Path = 0;
                                 } else {
-                                    uint32_t coreSwitch =
+                                    uint16_t coreSwitch =
                                         path % goodPaths.size();
                                     coreSwitch = goodPaths[coreSwitch];
                                     // Assume 1:1 oversubscription
@@ -306,28 +312,40 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                     t1Path = coreSwitch / nTorsPerPod;
                                     t2Path = coreSwitch % nTorsPerPod;
                                 }
-                                int myPath =
-                                    (static_cast<int>(t2Path) << 16) | t1Path;
-                                send_flow(std::get<0>(flow_vec[i]),
-                                          std::get<1>(flow_vec[i]),
-                                          std::get<2>(flow_vec[i]),
-                                          std::get<3>(flow_vec[i]),
-                                          std::get<4>(flow_vec[i]),
-                                          std::get<5>(flow_vec[i]), myPath);
+                                uint16_t mask = 0xFF00;
+                                uint16_t myPath = ((t2Path << 8) & mask) | (t1Path & 0x00FF);
+
+                                auto flow_tmp = flow_vec[i];
+                                auto src_tmp = std::get<0>(flow_tmp);
+                                auto dst_tmp = std::get<1>(flow_tmp);
+                                auto message_size_tmp = std::get<2>(flow_tmp);
+                                auto msg_handler_tmp = std::get<3>(flow_tmp);
+                                auto fun_arg_tmp = std::get<4>(flow_tmp);
+                                auto tag_tmp = std::get<5>(flow_tmp);
+                                // src_id, dst_id, message_size, msg_handler, fun_arg, tag
+                                uint32_t delay = randomize? m_rand->GetInteger(0, 500) : 0;
+                                Simulator::Schedule(NanoSeconds(delay),
+                                    [=]() {
+                                        send_flow(src_tmp,
+                                                  dst_tmp,
+                                                  message_size_tmp,
+                                                  msg_handler_tmp,
+                                                  fun_arg_tmp,
+                                                  tag_tmp, myPath);
+                                    });
                                 path++;
                             }
                             if (r > 0) {
+                                // if (numFlows > 1){
+                                //     std::cout << "splitting numFlows = " << numFlows << " remaining = " << r << " time " << Simulator::Now() << std::endl;
+                                // }
                                 // Split these last few flows in order to
                                 // achieve optimal load balancing
                                 uint32_t g = gcd(r, s);
                                 uint64_t numSplit = s / g;
-                                uint64_t flowSize =
-                                    std::get<2>(flow_vec[0]) / numSplit;
-                                uint64_t residualFlowSize =
-                                    std::get<2>(flow_vec[0]) % numSplit;
                                 for (int i = 0; i < r; i++) {
                                     NS_ASSERT_MSG(
-                                        std::get<2>(flow_vec[numFlows - 1]) ==
+                                        std::get<2>(flow_vec[numFlows - r + i]) ==
                                             std::get<2>(flow_vec[0]),
                                         "Flow size assumption failed!");
                                     for (int j = 0; j < numSplit; j++) {
@@ -338,7 +356,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                             t1Path = goodPaths[t1Path];
                                             t2Path = 0;
                                         } else {
-                                            uint32_t coreSwitch =
+                                            uint16_t coreSwitch =
                                                 path % goodPaths.size();
                                             coreSwitch = goodPaths[coreSwitch];
                                             // Assume 1:1 oversubscription
@@ -352,18 +370,29 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                             t1Path = coreSwitch / nTorsPerPod;
                                             t2Path = coreSwitch % nTorsPerPod;
                                         }
-                                        int myPath =
-                                            (static_cast<int>(t2Path) << 16) |
-                                            t1Path;
-                                        send_flow(
-                                            std::get<0>(flow_vec[numFlows - 1]),
-                                            std::get<1>(flow_vec[numFlows - 1]),
-                                            flowSize + residualFlowSize *
-                                                           (j == numSplit - 1),
-                                            std::get<3>(flow_vec[numFlows - 1]),
-                                            std::get<4>(flow_vec[numFlows - 1]),
-                                            std::get<5>(flow_vec[numFlows - 1]),
-                                            myPath);
+                                        uint16_t mask = 0xFF00;
+                                        uint16_t myPath = ((t2Path << 8) & mask) | (t1Path & 0x00FF);
+
+                                        auto flow_tmp = flow_vec[numFlows - r + i];
+                                        auto src_tmp = std::get<0>(flow_tmp);
+                                        auto dst_tmp = std::get<1>(flow_tmp);
+                                        uint64_t flowSize = std::get<2>(flow_tmp) / numSplit;
+                                        uint64_t residualFlowSize = std::get<2>(flow_tmp) % numSplit;
+                                        auto msg_handler_tmp = std::get<3>(flow_tmp);
+                                        auto fun_arg_tmp = std::get<4>(flow_tmp);
+                                        auto tag_tmp = std::get<5>(flow_tmp);
+                                        // src_id, dst_id, message_size, msg_handler, fun_arg, tag
+                                        uint32_t delay = randomize? m_rand->GetInteger(0, 500) : 0;
+                                        Simulator::Schedule(NanoSeconds(delay),
+                                            [=]() {
+                                                send_flow(src_tmp,
+                                                          dst_tmp,
+                                                          flowSize + residualFlowSize *
+                                                               (j == numSplit - 1),
+                                                          msg_handler_tmp,
+                                                          fun_arg_tmp,
+                                                          tag_tmp, myPath);
+                                            });
                                         path++;
                                     }
                                 }
@@ -376,10 +405,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                 }
             } else if (message_size > 0) {
                 // ToDO: Find a better way to check rack locality.
+                // The following logic is just for simplicilty, it works
+                // based on how we generate FatTree topologies currently.
                 uint32_t nPerTor = (nRanks / nTors);
-                bool rackLocal;
-                ((src_id / nPerTor) == (dst_id / nPerTor)) ? rackLocal = true
-                                                           : rackLocal = false;
+                bool rackLocal = ((src_id / nPerTor) == (dst_id / nPerTor));
                 if (!rackLocal) {
                     // No timer scheduled yet. This is the first message.
                     // Schedule the timer. Note that we will not send this
@@ -388,7 +417,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                     // message_size = 0 to identify the trigger.
                     if (!batchTimer.IsPending()) {
                         batchTimer = Simulator::Schedule(
-                            NanoSeconds(20), &ASTRASimNetwork::sim_send, this,
+                            NanoSeconds(100), &ASTRASimNetwork::sim_send, this,
                             nullptr, static_cast<uint64_t>(0), 0, 0, 0, nullptr,
                             nullptr, nullptr);
                     }
@@ -397,11 +426,17 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                         src_id, dst_id, message_size, msg_handler, fun_arg,
                         tag);
                 } else {
-                    // Rack Local flows should be sent immediately.
-                    // The following logic is just for simplicilty, it works
-                    // based on how we generate FatTree topologies currently.
-                    send_flow(src_id, dst_id, message_size, msg_handler,
-                              fun_arg, tag);
+                    // Rack Local flows can be sent without load balancing.
+                    auto src_tmp = src_id;
+                    auto dst_tmp = dst_id;
+                    auto message_size_tmp = message_size;
+                    auto msg_handler_tmp = msg_handler;
+                    auto fun_arg_tmp = fun_arg;
+                    auto tag_tmp = tag;
+                    uint32_t delay = randomize? m_rand->GetInteger(0, 500) : 0;
+                    Simulator::Schedule(NanoSeconds(delay),
+                        [=]() { send_flow(src_tmp, dst_tmp, message_size_tmp, msg_handler_tmp, fun_arg_tmp, tag_tmp); });
+                    // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
                 }
             } else {
                 std::cout << "Error in sim_send" << std::endl;
@@ -511,6 +546,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     std::unordered_map<int, std::vector<SendFlowArgs>> send_flow_args;
 
     int nRanks;
+
+    Ptr<UniformRandomVariable> m_rand;
 };
 
 // Command line arguments and default values.

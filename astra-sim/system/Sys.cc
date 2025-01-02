@@ -501,6 +501,11 @@ bool Sys::initialize_sys(string name) {
         if (inp_app_load_balance == "ethereal") {
             comm_NI->setAppLoadBalancing(
                 AstraNetworkAPI::appLoadBalancing::ETHEREAL);
+            if (j.contains("qp-randomize")) {
+                comm_NI->setRandomize(int(j["qp-randomize"]));
+            } else {
+                sys_panic("ethereal is enabled but qp-randomize is not specified in sys input file");
+            }
         } else if (inp_app_load_balance == "mp-rdma") {
             comm_NI->setAppLoadBalancing(
                 AstraNetworkAPI::appLoadBalancing::MP_RDMA);
@@ -513,6 +518,9 @@ bool Sys::initialize_sys(string name) {
                 sys_panic("mp-rdma is enabled but mp-rdma-qp is not set in sys "
                           "input file");
             }
+        } else if (inp_app_load_balance == "none"){
+            comm_NI->setAppLoadBalancing(
+                AstraNetworkAPI::appLoadBalancing::UNSPECIFIED);
         } else {
             sys_panic("unknown value for app load balancing in sys input file");
         }
