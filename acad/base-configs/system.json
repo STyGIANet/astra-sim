@@ -18,7 +18,7 @@
     "collective-optimization": "baseline",
     "local-mem-bw": 1600,
     "boost-mode": 0,
-    "app-load-balance": "ethereal",
+    "app-load-balance": "none",
     "qp-randomize": 0,
     "failed-path-timeout-ns": 100000000,
     "mp-rdma-qp": 2
