@@ -1,7 +1,7 @@
 #!/bin/bash
 
-N_CORES=4
 EXP=$1
+N_CORES=$2
 # find the absolute path to this script
 source config.sh
 
@@ -80,7 +80,6 @@ done
 #################################################################################
 # leaf-spine topology with 256 nodes
 # Various workloads and load balancing algorithms
-N_CORES=2
 NUM_NODES=256
 for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 	
