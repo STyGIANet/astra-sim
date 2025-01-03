@@ -8,7 +8,7 @@ source config.sh
 NODES=(256)
 MSG_SIZES=(1048576 2097152 4194304 8388608 16777216)
 TXT_WORKLOADS=("DLRM_HybridParallel" "Resnet50_DataParallel" "MLP_HybridParallel_Data_Model")
-ALLREDUCE_ALGS=("direct" "halvingDoubling" "ring" "doubleBinaryTree")
+ALLREDUCE_ALGS=("direct" "halvingDoubling")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
