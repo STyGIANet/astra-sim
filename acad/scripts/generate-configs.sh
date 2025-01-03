@@ -50,6 +50,11 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 	./chakra-text-to-et.sh $TXT_WORKLOAD-32-fat-tree 8192 1
 done
 
+cd $MEMORY_DIR
+cp $BASE_CONFIG_DIR/remote_memory.json remote_memory.json
+
+echo "0" > $PROJECT_DIR/acad/trace.txt
+
 # Generate logical topology files
 cd $LOGICAL_TOPO_DIR
 for NUM_NODES in "${NODES[@]}"; do
@@ -71,7 +76,7 @@ cd $SYSTEM_DIR
 for APP_LOADBALANCE_ALG in ${APP_LOADBALANCE_ALGS[@]}; do
     for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]}; do
         cp $BASE_CONFIG_DIR/system.json system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
-        perl -0777 -i -pe "s/\"all-reduce-implementation\":\s*\[\s*\"direct\"\s*\]/\"all-reduce-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
+        perl -0777 -i -pe "s/\"all-reduce-implementation\":\s*\[\s*\"ring\"\s*\]/\"all-reduce-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
 		perl -0777 -i -pe "s/\"all-gather-implementation\":\s*\[\s*\"ring\"\s*\]/\"all-gather-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
 		perl -0777 -i -pe "s/\"all-to-all-implementation\":\s*\[\s*\"ring\"\s*\]/\"all-to-all-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
 		perl -0777 -i -pe "s/\"reduce-scatter-implementation\":\s*\[\s*\"ring\"\s*\]/\"reduce-scatter-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
