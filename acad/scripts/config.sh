@@ -1,5 +1,5 @@
 #!/bin/bash
-
+ulimit -n 100000
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PROJECT_DIR=$(realpath "${SCRIPT_DIR:?}/../..")
 TXT_WORKLOAD_DIR="${PROJECT_DIR:?}/acad/text-workloads"

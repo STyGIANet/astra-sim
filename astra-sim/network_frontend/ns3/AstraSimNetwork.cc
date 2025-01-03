@@ -658,6 +658,7 @@ int main(int argc, char* argv[]) {
             networks[npu_id]->set_n_ranks(num_npus);
         }
     }
+    std::cout << "System Initialized!" << std::endl;
 
     // Initialize ns3 simulation.
     if (auto ok = setup_ns3_simulation(network_configuration); ok == -1) {
