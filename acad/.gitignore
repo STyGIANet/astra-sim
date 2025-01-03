@@ -5,3 +5,11 @@ qlen.txt
 trace.txt
 mix.tr
 *.et
+text-workloads/
+et-workloads/
+logical-topo-configs/
+network-configs/
+memory-configs/
+system-configs/
+network-topologies/
+*.log

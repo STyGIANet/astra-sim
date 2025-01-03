@@ -3,7 +3,7 @@ USE_DYNAMIC_PFC_THRESHOLD 1
 
 PACKET_PAYLOAD_SIZE 1000
 
-TOPOLOGY_FILE acad/network-topologies/leaf-spine-16-16-256.txt
+TOPOLOGY_FILE acad/base-configs/leaf-spine-16-16-256.txt
 FLOW_FILE ../../scratch/output/flow.txt
 TRACE_FILE acad/trace.txt
 TRACE_OUTPUT_FILE acad/mix.tr

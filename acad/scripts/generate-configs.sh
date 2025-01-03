@@ -1,23 +1,14 @@
 #!/bin/bash
 
 # find the absolute path to this script
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
-PROJECT_DIR="${SCRIPT_DIR:?}/../.."
-TXT_WORKLOAD_DIR="${PROJECT_DIR:?}/acad/text-workloads"
-ET_WORKLOAD_DIR="${PROJECT_DIR:?}/acad/et-workloads"
-LOGICAL_TOPO_DIR="${PROJECT_DIR:?}/acad/logical-topo-configs"
-NETWORK_DIR="${PROJECT_DIR:?}/acad/network-configs"
-MEMORY_DIR="${PROJECT_DIR:?}/acad/memory-configs"
-SYSTEM_DIR="${PROJECT_DIR:?}/acad/system-configs"
-NETWORK_TOPO_DIR="${PROJECT_DIR:?}/acad/network-topologies"
-
+source config.sh
 
 NODES=(256)
 MSG_SIZES=(1048576 2097152 4194304 8388608 16777216)
 TXT_WORKLOADS=("DLRM_HybridParallel" "Resnet50_DataParallel" "MLP_HybridParallel_Data_Model")
 ALLREDUCE_ALGS=("direct" "halvingDoubling" "ring" "doubleBinaryTree")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
-ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY")
+ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
 ## Hmm, it is probably better to generate these config files in-place in the respective scripts where needed.
 
@@ -30,7 +21,7 @@ for NUM_NODES in "${NODES[@]}"; do
 		echo "conv1 -1 5 NONE 0 5 NONE 0 5  ALLREDUCE $MSG_SIZE 5" >> AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine.txt
 	done
 	for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
-		cp "$TXT_WORKLOAD_DIR"/"$TXT_WORKLOAD".txt "$TXT_WORKLOAD_DIR"/$TXT_WORKLOAD-$NUM_NODES-leaf-spine.txt
+		cp "$BASE_CONFIG_DIR"/"$TXT_WORKLOAD".txt "$TXT_WORKLOAD_DIR"/$TXT_WORKLOAD-$NUM_NODES-leaf-spine.txt
 	done
 done
 for MSG_SIZE in ${MSG_SIZES[@]};do
@@ -39,7 +30,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 	echo "conv1 -1 5 NONE 0 5 NONE 0 5  ALLREDUCE $MSG_SIZE 5" >> AllReduce-32-$MSG_SIZE-fat-tree.txt
 done
 for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
-	cp "$TXT_WORKLOAD_DIR"/"$TXT_WORKLOAD".txt "$TXT_WORKLOAD_DIR"/$TXT_WORKLOAD-32-fat-tree.txt
+	cp "$BASE_CONFIG_DIR"/"$TXT_WORKLOAD".txt "$TXT_WORKLOAD_DIR"/$TXT_WORKLOAD-32-fat-tree.txt
 done
 
 # Next, generate et workload files
@@ -79,7 +70,7 @@ cd $SYSTEM_DIR
 
 for APP_LOADBALANCE_ALG in ${APP_LOADBALANCE_ALGS[@]}; do
     for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]}; do
-        cp system.json system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
+        cp $BASE_CONFIG_DIR/system.json system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
         perl -0777 -i -pe "s/\"all-reduce-implementation\":\s*\[\s*\"direct\"\s*\]/\"all-reduce-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
 		perl -0777 -i -pe "s/\"all-gather-implementation\":\s*\[\s*\"ring\"\s*\]/\"all-gather-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
 		perl -0777 -i -pe "s/\"all-to-all-implementation\":\s*\[\s*\"ring\"\s*\]/\"all-to-all-implementation\": [\"$ALLREDUCE_ALG\"]/g" system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
@@ -124,7 +115,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			for NUM_NODES in ${NODES[@]}; do
 			    N_TORS=$((NUM_NODES / N_PER_TOR))
 			    for ROUTING in ${ROUTING_ALGS[@]}; do
-			        cp config.txt config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			        cp $BASE_CONFIG_DIR/config.txt config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			        sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/leaf-spine-${N_TORS}-${N_TORS}-${NUM_NODES}.txt|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			        sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.tr|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			        sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
@@ -147,7 +138,7 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			for NUM_NODES in ${NODES[@]}; do
 			    N_TORS=$((NUM_NODES / N_PER_TOR))
 			    for ROUTING in ${ROUTING_ALGS[@]}; do
-			        cp config.txt config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			        cp $BASE_CONFIG_DIR/config.txt config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			        sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/leaf-spine-${N_TORS}-${N_TORS}-${NUM_NODES}.txt|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			        sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.tr|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			        sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
@@ -169,7 +160,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 	for APP_LOADBALANCE_ALG in ${APP_LOADBALANCE_ALGS[@]}; do
 	    for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]}; do
 			for ROUTING in ${ROUTING_ALGS[@]}; do
-			    cp config.txt config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    cp $BASE_CONFIG_DIR/config.txt config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			    sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/fat-tree-32.txt|g" config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			    sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.tr|g" config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			    sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
@@ -190,7 +181,7 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 	for APP_LOADBALANCE_ALG in ${APP_LOADBALANCE_ALGS[@]}; do
 	    for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]}; do
 			for ROUTING in ${ROUTING_ALGS[@]}; do
-			    cp config.txt config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    cp $BASE_CONFIG_DIR/config.txt config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			    sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/fat-tree-32.txt|g" config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			    sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.tr|g" config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			    sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-32-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt

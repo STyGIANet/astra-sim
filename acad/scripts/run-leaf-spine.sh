@@ -1,17 +1,9 @@
 #!/bin/bash
 
+N_CORES=4
+EXP=$1
 # find the absolute path to this script
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
-PROJECT_DIR="${SCRIPT_DIR:?}/../.."
-TXT_WORKLOAD_DIR="${PROJECT_DIR:?}/acad/text-workloads"
-ET_WORKLOAD_DIR="${PROJECT_DIR:?}/acad/et-workloads"
-LOGICAL_TOPO_DIR="${PROJECT_DIR:?}/acad/logical-topo-configs"
-NETWORK_DIR="${PROJECT_DIR:?}/acad/network-configs"
-MEMORY_DIR="${PROJECT_DIR:?}/acad/memory-configs"
-SYSTEM_DIR="${PROJECT_DIR:?}/acad/system-configs"
-NETWORK_TOPO_DIR="${PROJECT_DIR:?}/acad/network-topologies"
-RESULTS_DIR="${PROJECT_DIR:?}/acad/results"
-NS3_DIR="${SCRIPT_DIR:?}"/../../extern/network_backend/ns-3
+source config.sh
 
 NODES=(256)
 MSG_SIZES=(1048576 2097152 4194304 8388608 16777216)
@@ -40,13 +32,13 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			APP_LOADBALANCE_ALG="ethereal"
 		elif [[ $ALG == "mp-rdma-2" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-2"
 		elif [[ $ALG == "mp-rdma-4" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-4"
 		elif [[ $ALG == "mp-rdma-8" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-8"
 		elif [[ $ALG == "reps" ]];then
 			ROUTING="REPS"
 			APP_LOADBALANCE_ALG="none"
@@ -57,20 +49,29 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 
 		for ALLREDUCE_ALG in ${ALLREDUCE_ALGS};do
 
-			WORKLOAD=$(realpath ${ET_WORKLOAD_DIR}/AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine)
-			SYSTEM=$(realpath ${SYSTEM_DIR}/system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json)
-			NETWORK=$(realpath ${NETWORK_DIR}/config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt)
-			MEMORY=$(realpath ${MEMORY_DIR}/remote_memory.json)
-			LOGICAL_TOPOLOGY=$(realpath ${LOGICAL_TOPO_DIR}/logical-topo-$NUM_NODES.json)
+			while [[ $(( $(ps aux | grep AstraSimNetwork-default | wc -l) )) -gt $N_CORES ]];do
+				sleep 30;
+				echo "running $N experiment(s)..."
+			done
 
-			# time ("${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
-			#         --workload-configuration=${WORKLOAD} \
-			#         --system-configuration=${SYSTEM} \
-			#         --network-configuration=${NETWORK} \
-			#         --remote-memory-configuration=${MEMORY} \
-			#         --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
-			#         --comm-group-configuration=\"empty\")
+			WORKLOAD=${ET_WORKLOAD_DIR}/AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine
+			SYSTEM=${SYSTEM_DIR}/system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
+			NETWORK=${NETWORK_DIR}/config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			MEMORY=${MEMORY_DIR}/remote_memory.json
+			LOGICAL_TOPOLOGY=${LOGICAL_TOPO_DIR}/logical-topo-$NUM_NODES.json
+			OUTPUT_FILE=${RESULTS_DIR}/AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine-$ALG-$ALLREDUCE_ALG.out
 
+			cd ${PROJECT_DIR}
+			if [[ $EXP == 1 ]];then
+				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
+				        --workload-configuration=${WORKLOAD} \
+				        --system-configuration=${SYSTEM} \
+				        --network-configuration=${NETWORK} \
+				        --remote-memory-configuration=${MEMORY} \
+				        --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
+				        --comm-group-configuration=\"empty\" > ${OUTPUT_FILE} 2> ${OUTPUT_FILE})&
+			fi
+			sleep 2
 			echo "$NETWORK"
 			N=$(( $N+1 ))
 		done
@@ -79,6 +80,7 @@ done
 #################################################################################
 # leaf-spine topology with 256 nodes
 # Various workloads and load balancing algorithms
+N_CORES=2
 NUM_NODES=256
 for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 	
@@ -89,13 +91,13 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			APP_LOADBALANCE_ALG="ethereal"
 		elif [[ $ALG == "mp-rdma-2" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-2"
 		elif [[ $ALG == "mp-rdma-4" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-4"
 		elif [[ $ALG == "mp-rdma-8" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-8"
 		elif [[ $ALG == "reps" ]];then
 			ROUTING="REPS"
 			APP_LOADBALANCE_ALG="none"
@@ -106,20 +108,29 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 
 		for ALLREDUCE_ALG in ${ALLREDUCE_ALGS};do
 
-			WORKLOAD=$(realpath ${ET_WORKLOAD_DIR}/$TXT_WORKLOAD-$NUM_NODES-leaf-spine)
-			SYSTEM=$(realpath ${SYSTEM_DIR}/system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json)
-			NETWORK=$(realpath ${NETWORK_DIR}/config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt)
-			MEMORY=$(realpath ${MEMORY_DIR}/remote_memory.json)
-			LOGICAL_TOPOLOGY=$(realpath ${LOGICAL_TOPO_DIR}/logical-topo-$NUM_NODES.json)
+			while [[ $(( $(ps aux | grep AstraSimNetwork-default | wc -l) )) -gt $N_CORES ]];do
+				sleep 30;
+				echo "running $N experiment(s)..."
+			done
 
-			# "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
-			#         --workload-configuration=${WORKLOAD} \
-			#         --system-configuration=${SYSTEM} \
-			#         --network-configuration=${NETWORK} \
-			#         --remote-memory-configuration=${MEMORY} \
-			#         --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
-			#         --comm-group-configuration=\"empty\"
+			WORKLOAD=${ET_WORKLOAD_DIR}/$TXT_WORKLOAD-$NUM_NODES-leaf-spine
+			SYSTEM=${SYSTEM_DIR}/system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
+			NETWORK=${NETWORK_DIR}/config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			MEMORY=${MEMORY_DIR}/remote_memory.json
+			LOGICAL_TOPOLOGY=${LOGICAL_TOPO_DIR}/logical-topo-$NUM_NODES.json
+			OUTPUT_FILE=${RESULTS_DIR}/AllReduce-$NUM_NODES-$TXT_WORKLOAD-leaf-spine-$ALG-$ALLREDUCE_ALG.out
 
+			cd ${PROJECT_DIR}
+			if [[ $EXP == 1 ]];then
+				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
+				        --workload-configuration=${WORKLOAD} \
+				        --system-configuration=${SYSTEM} \
+				        --network-configuration=${NETWORK} \
+				        --remote-memory-configuration=${MEMORY} \
+				        --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
+				        --comm-group-configuration=\"empty\" > ${OUTPUT_FILE} 2> ${OUTPUT_FILE})&
+			fi
+			sleep 2
 			echo "$NETWORK"
 			N=$(( $N+1 ))
 		done

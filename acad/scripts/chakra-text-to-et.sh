@@ -9,10 +9,8 @@ set -e
 ## ******************************************************************************
 
 # find the absolute path to this script
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
-PROJECT_DIR="${SCRIPT_DIR:?}/../.."
-TXT_DIR="${PROJECT_DIR:?}/acad/text-workloads"
-ET_DIR="${PROJECT_DIR:?}/acad/et-workloads"
+source config.sh
+
 TARGET_WORKLOAD=$1
 NUM_NPUS=$2
 NUM_PASSES=$3
@@ -32,14 +30,9 @@ echo "[ASTRA-sim] Chakra installation done."
 echo "[ASTRA-sim] Running Text-to-Chakra converter..."
 echo ""
 
-# check if $ET_DIR exists and create the directory if not
-if [ ! -d "${ET_DIR:?}" ]; then
-    mkdir -p "${ET_DIR:?}"
-fi
-
 chakra_converter Text \
-    --input="${TXT_DIR:?}/${TARGET_WORKLOAD:?}.txt" \
-    --output="${ET_DIR:?}/${TARGET_WORKLOAD:?}" \
+    --input="${TXT_WORKLOAD_DIR:?}/${TARGET_WORKLOAD:?}.txt" \
+    --output="${ET_WORKLOAD_DIR:?}/${TARGET_WORKLOAD:?}" \
     --num-npus=${NUM_NPUS} \
     --num-passes=${NUM_PASSES}
 

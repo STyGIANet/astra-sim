@@ -36,13 +36,13 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			APP_LOADBALANCE_ALG="ethereal"
 		elif [[ $ALG == "mp-rdma-2" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-2"
 		elif [[ $ALG == "mp-rdma-4" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-4"
 		elif [[ $ALG == "mp-rdma-8" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-8"
 		elif [[ $ALG == "reps" ]];then
 			ROUTING="REPS"
 			APP_LOADBALANCE_ALG="none"
@@ -72,13 +72,13 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			APP_LOADBALANCE_ALG="ethereal"
 		elif [[ $ALG == "mp-rdma-2" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-2"
 		elif [[ $ALG == "mp-rdma-4" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-4"
 		elif [[ $ALG == "mp-rdma-8" ]];then
 			ROUTING="ECMP"
-			APP_LOADBALANCE_ALG="mp-rdma"
+			APP_LOADBALANCE_ALG="mp-rdma-8"
 		elif [[ $ALG == "reps" ]];then
 			ROUTING="REPS"
 			APP_LOADBALANCE_ALG="none"
