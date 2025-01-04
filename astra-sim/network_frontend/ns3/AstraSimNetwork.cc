@@ -295,7 +295,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                 // routing
                                 uint16_t t1Path;
                                 uint16_t t2Path;
-                                if (t2Links == 0) {
+                                if (t2Links == 0 || pathMatrix[dst].size() < t2Links) {
                                     t1Path = path % goodPaths.size();
                                     t1Path = goodPaths[t1Path];
                                     t2Path = 0;
@@ -351,7 +351,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                     for (int j = 0; j < numSplit; j++) {
                                         uint16_t t1Path;
                                         uint16_t t2Path;
-                                        if (t2Links == 0) {
+                                        if (t2Links == 0 || pathMatrix[dst].size() < t2Links) {
                                             t1Path = path % goodPaths.size();
                                             t1Path = goodPaths[t1Path];
                                             t2Path = 0;
