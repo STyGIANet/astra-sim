@@ -6,7 +6,7 @@ N_CORES=$2
 source config.sh
 
 NODES=(256)
-MSG_SIZES=(1048576 2097152 4194304 8388608 16777216)
+MSG_SIZES=(1048576 2097152 4194304 8388608 16777216 33554432 67108864)
 TXT_WORKLOADS=("DLRM_HybridParallel" "Resnet50_DataParallel" "MLP_HybridParallel_Data_Model")
 ALLREDUCE_ALGS=("direct" "halvingDoubling" "ring" "doubleBinaryTree")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
