@@ -10,6 +10,8 @@ ALLREDUCE_ALGS=("direct" "halvingDoubling" "ring" "doubleBinaryTree")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
+K=8
+NODES_FT=512
 ## Hmm, it is probably better to generate these config files in-place in the respective scripts where needed.
 
 # First, generate txt workload files
@@ -25,12 +27,12 @@ for NUM_NODES in "${NODES[@]}"; do
 	done
 done
 for MSG_SIZE in ${MSG_SIZES[@]};do
-	echo "MICRO" > AllReduce-16-$MSG_SIZE-fat-tree.txt
-	echo "1" >> AllReduce-16-$MSG_SIZE-fat-tree.txt
-	echo "conv1 -1 5 NONE 0 5 NONE 0 5  ALLREDUCE $MSG_SIZE 5" >> AllReduce-16-$MSG_SIZE-fat-tree.txt
+	echo "MICRO" > AllReduce-$K-$MSG_SIZE-fat-tree.txt
+	echo "1" >> AllReduce-$K-$MSG_SIZE-fat-tree.txt
+	echo "conv1 -1 5 NONE 0 5 NONE 0 5  ALLREDUCE $MSG_SIZE 5" >> AllReduce-$K-$MSG_SIZE-fat-tree.txt
 done
 for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
-	cp "$BASE_CONFIG_DIR"/"$TXT_WORKLOAD".txt "$TXT_WORKLOAD_DIR"/$TXT_WORKLOAD-16-fat-tree.txt
+	cp "$BASE_CONFIG_DIR"/"$TXT_WORKLOAD".txt "$TXT_WORKLOAD_DIR"/$TXT_WORKLOAD-$K-fat-tree.txt
 done
 
 # Next, generate et workload files
@@ -44,10 +46,10 @@ for NUM_NODES in "${NODES[@]}"; do
 	done
 done
 for MSG_SIZE in ${MSG_SIZES[@]};do
-	./chakra-text-to-et.sh AllReduce-16-$MSG_SIZE-fat-tree 1024 1
+	./chakra-text-to-et.sh AllReduce-$K-$MSG_SIZE-fat-tree $NODES_FT 1
 done
 for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
-	./chakra-text-to-et.sh $TXT_WORKLOAD-16-fat-tree 1024 1
+	./chakra-text-to-et.sh $TXT_WORKLOAD-$K-fat-tree $NODES_FT 1
 done
 
 cd $MEMORY_DIR
@@ -63,11 +65,11 @@ for NUM_NODES in "${NODES[@]}"; do
 	echo "    \"logical-dims\": [\"$NUM_NODES\"]" >> logical-topo-$NUM_NODES.json
 	echo "}" >> logical-topo-$NUM_NODES.json
 done
-NUM_NODES=1024
-echo "Generating logical topology files for $NUM_NODES nodes"
-echo "{" > logical-topo-$NUM_NODES.json
-echo "    \"logical-dims\": [\"$NUM_NODES\"]" >> logical-topo-$NUM_NODES.json
-echo "}" >> logical-topo-$NUM_NODES.json
+
+echo "Generating logical topology files for $NODES_FT nodes"
+echo "{" > logical-topo-$NODES_FT.json
+echo "    \"logical-dims\": [\"$NODES_FT\"]" >> logical-topo-$NODES_FT.json
+echo "}" >> logical-topo-$NODES_FT.json
 
 #########################################################################
 # Generate sys config files
@@ -99,7 +101,7 @@ done
 #########################################################################
 # Generate network topology files
 cd $SCRIPT_DIR
-N_PER_TOR=32 # Tomahawk 3, 32-port switch, 64MB Shared buffer
+N_PER_TOR=16 # Tomahawk 3, 32-port switch, 64MB Shared buffer
 
 # Leaf-spine topologies
 for NUM_NODES in "${NODES[@]}"; do
@@ -107,8 +109,8 @@ for NUM_NODES in "${NODES[@]}"; do
     python generate-topology.py -l 0.0005ms -nicbw 400Gbps -t1bw 400Gbps -g $NUM_NODES -tors ${N_TORS} -spines ${N_TORS} -topo leafspine
 done
 
-# k-ary fat-tree k=16. Total 1024 nodes
-python generate-topology.py -l 0.0005ms -nicbw 800Gbps -t1bw 800Gbps -t2bw 800Gbps -topo fattree -k 16
+# k-ary fat-tree k=8. Total 512 nodes, oversub 4:1 (in terms of the number of links)
+python generate-topology.py -l 0.0005ms -nicbw 400Gbps -t1bw 1600Gbps -t2bw 1600Gbps -topo fattree -k $K -os 4
 
 #########################################################################
 # Generate network config files
@@ -165,18 +167,18 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 	for APP_LOADBALANCE_ALG in ${APP_LOADBALANCE_ALGS[@]}; do
 	    for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]}; do
 			for ROUTING in ${ROUTING_ALGS[@]}; do
-			    cp $BASE_CONFIG_DIR/config.txt config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/fat-tree-16.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.tr|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|PFC_OUTPUT_FILE .*|PFC_OUTPUT_FILE acad/results/pfc-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|QLEN_MON_FILE .*|QLEN_MON_FILE acad/results/qlen-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    cp $BASE_CONFIG_DIR/config.txt config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/fat-tree-$K.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.tr|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|PFC_OUTPUT_FILE .*|PFC_OUTPUT_FILE acad/results/pfc-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|QLEN_MON_FILE .*|QLEN_MON_FILE acad/results/qlen-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 
-			    sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|REPS .*|REPS 0|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
-			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|REPS .*|REPS 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 
-			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			done
 		done
 	done
@@ -186,18 +188,18 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 	for APP_LOADBALANCE_ALG in ${APP_LOADBALANCE_ALGS[@]}; do
 	    for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]}; do
 			for ROUTING in ${ROUTING_ALGS[@]}; do
-			    cp $BASE_CONFIG_DIR/config.txt config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/fat-tree-16.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.tr|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|PFC_OUTPUT_FILE .*|PFC_OUTPUT_FILE acad/results/pfc-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|QLEN_MON_FILE .*|QLEN_MON_FILE acad/results/qlen-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    cp $BASE_CONFIG_DIR/config.txt config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|TOPOLOGY_FILE .*|TOPOLOGY_FILE acad/network-topologies/fat-tree-$K.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|TRACE_OUTPUT_FILE .*|TRACE_OUTPUT_FILE acad/results/mix-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.tr|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|FCT_OUTPUT_FILE .*|FCT_OUTPUT_FILE acad/results/fct-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|PFC_OUTPUT_FILE .*|PFC_OUTPUT_FILE acad/results/pfc-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|QLEN_MON_FILE .*|QLEN_MON_FILE acad/results/qlen-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 
-			    sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|REPS .*|REPS 0|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
-			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|REPS .*|REPS 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 
-			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-16-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			done
 		done
 	done

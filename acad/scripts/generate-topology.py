@@ -40,12 +40,14 @@ def gen_leaf_spine(args):
 
 def gen_fat_tree(args):
     k = args.k_ary
+    oversub = args.oversubscription
     numPods = int(k)
-    numGpus = int(k*k*k/4)
+    numGpus = int(oversub*k*k*k/4)
     numTors = int(k*k/2)
     numSpines = int(k*k/2)
     numCores = int(k*k/4)
-    numLinks = numGpus*3
+    numLinks = int((k*k*k/4)*3 + (oversub - 1)*(k*k*k/4))
+    nPerTor = int(oversub*k/2)
     numNodes = numGpus + numTors + numSpines + numCores
     numSwitches = numNodes - numGpus
     print("fatree", " k:",k, " numGpus:",numGpus, " numTors:",numTors, " numSpines:",numSpines, " numCores:",numCores, " numLinks:",numLinks, " numNodes:",numNodes, " numSwitches:",numSwitches)
@@ -66,7 +68,7 @@ def gen_fat_tree(args):
         # write the links
         # each gpu is connected to a ToR switch
         for i in range(numGpus):
-            f.write(str(i) + " " + str(numGpus + int(i / (k/2))) + " " + str(args.nic_bandwidth) + " " + str(args.latency) + " " + str(args.error_rate))
+            f.write(str(i) + " " + str(numGpus + int(i / nPerTor)) + " " + str(args.nic_bandwidth) + " " + str(args.latency) + " " + str(args.error_rate))
             f.write('\n')
 
         # ToR <--> Spine/Agg links
@@ -94,6 +96,7 @@ def main():
     parser.add_argument('-spines','--spine_num',type=int,default=64,help='number of spine switches,default 64')
     parser.add_argument('-topo','--topology',type=str,default='leafspine',help='topology type,default leaf-spine,other options: fattree')
     parser.add_argument('-k','--k_ary',type=int,default=4,help='k-ary fat-tree or leaf-spine,default 4')
+    parser.add_argument('-os','--oversubscription',type=int,default=1,help='oversubscription,default 1')
     args = parser.parse_args()
     if (str(args.topology) == 'leafspine'):
         gen_leaf_spine(args)
