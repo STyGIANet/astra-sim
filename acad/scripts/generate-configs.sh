@@ -101,16 +101,16 @@ done
 #########################################################################
 # Generate network topology files
 cd $SCRIPT_DIR
-N_PER_TOR=16 # Tomahawk 3, 32-port switch, 64MB Shared buffer
+N_PER_TOR=16 # Tomahawk, 32-port switch, 32MB Shared buffer
 
 # Leaf-spine topologies
 for NUM_NODES in "${NODES[@]}"; do
     N_TORS=$((NUM_NODES / N_PER_TOR))
-    python generate-topology.py -l 0.0005ms -nicbw 400Gbps -t1bw 400Gbps -g $NUM_NODES -tors ${N_TORS} -spines ${N_TORS} -topo leafspine
+    python generate-topology.py -l 0.0005ms -nicbw 100Gbps -t1bw 100Gbps -g $NUM_NODES -tors ${N_TORS} -spines ${N_TORS} -topo leafspine
 done
 
 # k-ary fat-tree k=8. Total 512 nodes, oversub 4:1 (in terms of the number of links)
-python generate-topology.py -l 0.0005ms -nicbw 400Gbps -t1bw 1600Gbps -t2bw 1600Gbps -topo fattree -k $K -os 4
+python generate-topology.py -l 0.0005ms -nicbw 100Gbps -t1bw 400Gbps -t2bw 400Gbps -topo fattree -k $K -os 4
 
 #########################################################################
 # Generate network config files
