@@ -284,7 +284,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                                   numFailedPaths[dst],
                                           "Good paths size mismatch!");
                             uint32_t s = goodPaths.size();
-                            uint32_t path = randomize? m_rand->GetInteger(0, s - 1): 0;
+                            uint32_t path = 0;
                             uint32_t r = numFlows % s;
                             // Send these flows as usual
                             for (uint32_t i = 0; i < numFlows - r; i++) {
