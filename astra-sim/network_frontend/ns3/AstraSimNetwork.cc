@@ -269,7 +269,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                         }
                         uint32_t numFlows = flow_vec.size();
                         if (numFlows > 0) {
-                            std::vector<int> goodPaths;
+                            std::vector<uint32_t> goodPaths;
                             for (uint32_t p = 0; p < pathMatrix[dst].size();
                                  p++) {
                                 if (!pathMatrix[dst][p].IsPending()) {
@@ -284,10 +284,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                                   numFailedPaths[dst],
                                           "Good paths size mismatch!");
                             uint32_t s = goodPaths.size();
-                            uint32_t path = 0;
+                            uint32_t path = randomize? m_rand->GetInteger(0, s - 1): 0;
                             uint32_t r = numFlows % s;
                             // Send these flows as usual
-                            for (int i = 0; i < numFlows - r; i++) {
+                            for (uint32_t i = 0; i < numFlows - r; i++) {
                                 NS_ASSERT_MSG(std::get<2>(flow_vec[i]) ==
                                                   std::get<2>(flow_vec[0]),
                                               "Flow size assumption failed!");
@@ -323,7 +323,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                 auto fun_arg_tmp = std::get<4>(flow_tmp);
                                 auto tag_tmp = std::get<5>(flow_tmp);
                                 // src_id, dst_id, message_size, msg_handler, fun_arg, tag
-                                uint32_t delay = randomize? m_rand->GetInteger(0, 500) : 0;
+                                uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
                                 Simulator::Schedule(NanoSeconds(delay),
                                     [=]() {
                                         send_flow(src_tmp,
@@ -336,16 +336,14 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                 path++;
                             }
                             if (r > 0) {
-                                // if (numFlows > 1){
-                                //     std::cout << "splitting numFlows = " << numFlows << " remaining = " << r << " time " << Simulator::Now() << std::endl;
-                                // }
                                 // Split these last few flows in order to
                                 // achieve optimal load balancing
                                 uint32_t g = gcd(r, s);
                                 uint64_t numSplit = s / g;
-                                for (int i = 0; i < r; i++) {
+                                // std::cout << "splitting numFlows = " << r << " numSplit = " << numSplit << " time " << Simulator::Now().GetNanoSeconds() << std::endl;
+                                for (uint32_t i = 0; i < r; i++) {
                                     NS_ASSERT_MSG(
-                                        std::get<2>(flow_vec[numFlows - r + i]) ==
+                                        std::get<2>(flow_vec[(numFlows - r) + i]) ==
                                             std::get<2>(flow_vec[0]),
                                         "Flow size assumption failed!");
                                     for (int j = 0; j < numSplit; j++) {
@@ -373,26 +371,38 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                         uint16_t mask = 0xFF00;
                                         uint16_t myPath = ((t2Path << 8) & mask) | (t1Path & 0x00FF);
 
-                                        auto flow_tmp = flow_vec[numFlows - r + i];
+                                        auto flow_tmp = flow_vec[(numFlows - r) + i];
                                         auto src_tmp = std::get<0>(flow_tmp);
                                         auto dst_tmp = std::get<1>(flow_tmp);
                                         uint64_t flowSize = std::get<2>(flow_tmp) / numSplit;
-                                        uint64_t residualFlowSize = std::get<2>(flow_tmp) % numSplit;
+                                        uint64_t residualFlowSize = flowSize + std::get<2>(flow_tmp) % numSplit;
                                         auto msg_handler_tmp = std::get<3>(flow_tmp);
                                         auto fun_arg_tmp = std::get<4>(flow_tmp);
                                         auto tag_tmp = std::get<5>(flow_tmp);
                                         // src_id, dst_id, message_size, msg_handler, fun_arg, tag
-                                        uint32_t delay = randomize? m_rand->GetInteger(0, 500) : 0;
-                                        Simulator::Schedule(NanoSeconds(delay),
-                                            [=]() {
-                                                send_flow(src_tmp,
-                                                          dst_tmp,
-                                                          flowSize + residualFlowSize *
-                                                               (j == numSplit - 1),
-                                                          msg_handler_tmp,
-                                                          fun_arg_tmp,
-                                                          tag_tmp, myPath);
-                                            });
+                                        uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
+                                        if (j == numSplit-1){
+                                            Simulator::Schedule(NanoSeconds(delay),
+                                                [=]() {
+                                                    send_flow(src_tmp,
+                                                              dst_tmp,
+                                                              residualFlowSize,
+                                                              msg_handler_tmp,
+                                                              fun_arg_tmp,
+                                                              tag_tmp, myPath);
+                                                });
+                                        }
+                                        else{
+                                            Simulator::Schedule(NanoSeconds(delay),
+                                                [=]() {
+                                                    send_flow(src_tmp,
+                                                              dst_tmp,
+                                                              flowSize,
+                                                              msg_handler_tmp,
+                                                              fun_arg_tmp,
+                                                              tag_tmp, myPath);
+                                                });
+                                        }
                                         path++;
                                     }
                                 }
@@ -433,7 +443,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                     auto msg_handler_tmp = msg_handler;
                     auto fun_arg_tmp = fun_arg;
                     auto tag_tmp = tag;
-                    uint32_t delay = randomize? m_rand->GetInteger(0, 500) : 0;
+                    uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
                     Simulator::Schedule(NanoSeconds(delay),
                         [=]() { send_flow(src_tmp, dst_tmp, message_size_tmp, msg_handler_tmp, fun_arg_tmp, tag_tmp); });
                     // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
