@@ -53,7 +53,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 
 		for ALLREDUCE_ALG in ${ALLREDUCE_ALGS[@]};do
 
-			while [[ $(( $(ps aux | grep AstraSimNetwork-default | wc -l) )) -gt $N_CORES ]];do
+			while [[ $(( $(ps aux | grep AstraSimNetwork-optimized | wc -l) )) -gt $N_CORES ]];do
 				sleep 30;
 				echo "running $N experiment(s)..."
 			done
@@ -67,7 +67,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 
 			cd ${PROJECT_DIR}
 			if [[ $EXP == 1 ]];then
-				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
+				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
 				        --workload-configuration=${WORKLOAD} \
 				        --system-configuration=${SYSTEM} \
 				        --network-configuration=${NETWORK} \
@@ -75,7 +75,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 				        --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
 				        --comm-group-configuration=\"empty\" > ${OUTPUT_FILE} 2> ${OUTPUT_FILE}; echo $OUTPUT_FILE)&
 				
-				# gdb --args "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
+				# gdb --args "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
 				#         --workload-configuration=${WORKLOAD} \
 				#         --system-configuration=${SYSTEM} \
 				#         --network-configuration=${NETWORK} \
@@ -83,7 +83,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 				#         --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
 				#         --comm-group-configuration=\"empty\"
 
-				# (time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
+				# (time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
 				#         --workload-configuration=${WORKLOAD} \
 				#         --system-configuration=${SYSTEM} \
 				#         --network-configuration=${NETWORK} \

@@ -25,12 +25,12 @@ function setup {
 }
 function compile {
     cd "${NS3_DIR}"
-    ./ns3 configure --enable-mpi
+    ./ns3 configure --enable-mpi --build-profile=optimized
     ./ns3 build AstraSimNetwork -j $(nproc)
     cd "${SCRIPT_DIR:?}"
 }
 function run {
-    "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-default \
+    "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
         --workload-configuration=${WORKLOAD} \
         --system-configuration=${SYSTEM} \
         --network-configuration=${NETWORK} \
