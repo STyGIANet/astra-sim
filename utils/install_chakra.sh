@@ -14,6 +14,7 @@ PROJECT_DIR="${SCRIPT_DIR:?}/.."
 CHAKRA_DIR="${PROJECT_DIR:?}/extern/graph_frontend/chakra"
 PARAM_DIR="${PROJECT_DIR:?}/extern/graph_frontend/param"
 
+pip uninstall chakra -y || true
 # start
 echo "[ASTRA-sim] Installing Chakra Package..."
 
