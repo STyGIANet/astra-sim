@@ -108,3 +108,11 @@ singularity build astra-sim.sif Singularity.def
 # Critical Changes
 
 TBA
+
+# Notes
+
+[Astra-sim commit](https://github.com/astra-sim/astra-sim/commit/0ea03a36887adcb50bfa12a58cb7c023710d584b) when they moved to chakra execution traces.
+
+[iterate_hybrid_parallel_Transformer_fwd_in_bckwd](https://github.com/astra-sim/astra-sim/blob/e135b2f3b73f3be4372c98fe031801b8d00b37a7/astra-sim/workload/Workload.cc#L106C1-L107C1)
+
+This doesn't exist anymore in Chakra's [text converter](https://github.com/mlcommons/chakra/blob/92474895d7ad0c736fe7468d5704cac052c28fd7/src/converter/text_converter.py#L131).
