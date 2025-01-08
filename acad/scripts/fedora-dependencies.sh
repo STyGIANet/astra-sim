@@ -8,6 +8,9 @@ sudo dnf -y install python3-pip
 sudo dnf -y install protobuf-devel protobuf-compiler
 sudo dnf -y install openmpi-devel openmpi-doc
 # Python packages
+if command -v conda &> /dev/null; then
+    conda uninstall -y libprotobuf
+fi
 pip3 install --upgrade pip
 pip3 install protobuf==5.28.2
 pip3 install graphviz pydot

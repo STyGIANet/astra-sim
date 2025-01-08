@@ -8,5 +8,8 @@ sudo apt -y install libprotobuf-dev protobuf-compiler
 sudo apt -y install openmpi-bin openmpi-doc libopenmpi-dev
 # Python packages
 pip3 install --upgrade pip
+if command -v conda &> /dev/null; then
+    conda uninstall -y libprotobuf
+fi
 pip3 install protobuf==5.28.2
 pip3 install graphviz pydot
