@@ -4,7 +4,7 @@
 source config.sh
 
 NODES=(256)
-MSG_SIZES=(1048576 2097152 4194304 8388608 16777216 33554432 67108864 134217728 268435456)
+MSG_SIZES=(1000000 2000000 4000000 8000000 16000000 32000000 64000000 128000000 256000000)
 TXT_WORKLOADS=("DLRM_HybridParallel" "Resnet50_DataParallel" "MLP_HybridParallel_Data_Model")
 ALLREDUCE_ALGS=("direct" "halvingDoubling" "ring" "doubleBinaryTree")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
