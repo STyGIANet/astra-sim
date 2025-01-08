@@ -10,9 +10,8 @@ This repository is a fork from the original [astra-sim](https://astra-sim.github
 
 In addition, we've made minor changes to non-critical files in astra-sim to resolve compilation errors with newer versions of gcc. Further, we mainly intend to use this repository for research on distributed training, and will push any new network protocols/algorithms in the near-future.
 
-**Please refer to the original repository [astra-sim](https://astra-sim.github.io/) for installation instructions and any questions regarding astra-sim.** Nevertheless, we remain committed to help you out regarding any of the algorithms and protocols originating primarily from this fork.
+**Please refer to the original repository [astra-sim](https://astra-sim.github.io/) for installation instructions and any questions regarding astra-sim.** Nevertheless, we remain committed to help you out regarding any of the algorithms and protocols originating primarily from this fork. 
 
-**All our scripts can be found in the [acad](https://github.com/STyGIANet/astra-sim/tree/dev/acad) directory.**
 
 The following congestion control, buffer sharing algorithms, have been inherited from the historical version of ns3 used in this repository.
 
@@ -23,7 +22,7 @@ The following congestion control, buffer sharing algorithms, have been inherited
 - Dynamic Thresholds
 - Everything from NS3 release versions
 
-What this fork mainly offers is a set of new protocols and algorithms from research and scripts to run large scale evaluations.
+What this fork mainly offers is a set of new protocols and algorithms from research and scripts to run large scale evaluations. All our scripts can be found in the [acad](https://github.com/STyGIANet/astra-sim/tree/dev/acad) directory.
 
 # Clone and Setup a Development Environment
 
@@ -59,13 +58,13 @@ gcc version 13.3.1 20240611 (Red Hat 13.3.1-2) (GCC)
 To install the dependencies, use the following script
 
 ```
-./fedora-dependencies.sh
+./acad/scripts/fedora-dependencies.sh
 ```
 
 For ubuntu:
 
 ```
-./ubuntu-dependencies.sh
+./acad/scripts/ubuntu-dependencies.sh
 ```
 # Example
 
