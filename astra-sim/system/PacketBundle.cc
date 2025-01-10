@@ -59,6 +59,8 @@ void PacketBundle::call(EventType event, CallData* data) {
                                               sys->local_mem_bw * 1e9)  // read
                       + static_cast<uint64_t>(static_cast<double>(size) /
                                               sys->local_mem_bw * 1e9);  // read
+        // ToDO: Revert this change when Ring.cc, AllToAll.cc, HalvingDoubling.cc resolve the issue with dangling pointers
+        this->delay = 0;
         sys->try_register_event(this, EventType::CommProcessingFinished, data,
                                 this->delay);
         return;
