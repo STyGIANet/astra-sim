@@ -88,14 +88,20 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     void setLinkFailure(uint32_t uplink, uint32_t dst) {
         uint32_t nPerTor = (nRanks / nTors);
         uint32_t dst_tor = dst / nPerTor;
-        NS_ASSERT_MSG(uplink < pathMatrix[dst_tor].size(),
+        uint32_t u;
+        if (t2Links == 0 || pathMatrix[dst_tor].size() < t2Links) {
+            u = uplink & 0x00FF;
+        } else {
+            u = (uplink & 0x00FF) * nTorsPerPod + ((uint16_t)(uplink)) >> 8;
+        }
+        NS_ASSERT_MSG(u < pathMatrix[dst_tor].size(),
                       "Invalid uplink index");
-        if (pathMatrix[dst_tor][uplink].IsPending()) {
-            pathMatrix[dst_tor][uplink].Remove();
+        if (pathMatrix[dst_tor][u].IsPending()) {
+            pathMatrix[dst_tor][u].Remove();
         } else {
             numFailedPaths[dst_tor]++;
         }
-        pathMatrix[dst_tor][uplink] = Simulator::Schedule(
+        pathMatrix[dst_tor][u] = Simulator::Schedule(
             NanoSeconds(failedPathResetTimeOut),
             &ASTRASimNetwork::resetLinkFailure, this, uplink, dst);
     }
@@ -103,7 +109,13 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     void resetLinkFailure(uint32_t uplink, uint32_t dst) {
         uint32_t nPerTor = (nRanks / nTors);
         uint32_t dst_tor = dst / nPerTor;
-        NS_ASSERT_MSG(uplink < pathMatrix[dst_tor].size(),
+        uint32_t u;        
+        if (t2Links == 0 || pathMatrix[dst_tor].size() < t2Links) {
+            u = uplink & 0x00FF;
+        } else {
+            u = (uplink & 0x00FF) * nTorsPerPod + ((uint16_t)(uplink)) >> 8;
+        }
+        NS_ASSERT_MSG(u < pathMatrix[dst_tor].size(),
                       "Invalid uplink index");
         if (numFailedPaths[dst_tor] > 0) {
             numFailedPaths[dst_tor]--;
