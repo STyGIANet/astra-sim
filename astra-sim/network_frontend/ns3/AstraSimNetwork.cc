@@ -256,7 +256,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                         keys.push_back(dst);
                     }
                     std::random_device rd;
-                    std::mt19937 gen(rd());
+                    std::mt19937 gen(rank);
                     std::shuffle(keys.begin(), keys.end(), gen);
 
                     // Load balance
