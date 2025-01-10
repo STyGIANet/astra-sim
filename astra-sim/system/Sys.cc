@@ -225,8 +225,8 @@ Sys::Sys(int id,
 
     this->concurrent_streams =
         (int)ceil(((double)active_chunks_per_dimension) / queues_per_dim[0]);
-    this->active_first_phase = 100000000;
-    this->max_running = 100000000;
+    this->active_first_phase = 1;
+    this->max_running = 1;
 
     scheduler_unit = new SchedulerUnit(this, queues_per_dim, max_running,
                                        active_first_phase, concurrent_streams);
