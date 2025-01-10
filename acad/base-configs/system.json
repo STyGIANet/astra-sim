@@ -1,6 +1,6 @@
 {
     "scheduling-policy": "LIFO",
-    "endpoint-delay": 10,
+    "endpoint-delay": 0,
     "active-chunks-per-dimension": 1,
     "preferred-dataset-splits": 1,
     "all-reduce-implementation": [
@@ -16,7 +16,7 @@
         "ring"
     ],
     "collective-optimization": "baseline",
-    "local-mem-bw": 1600,
+    "local-mem-bw": 20000000000,
     "boost-mode": 0,
     "app-load-balance": "none",
     "qp-randomize": 0,
