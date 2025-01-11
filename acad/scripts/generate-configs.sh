@@ -134,6 +134,12 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			        sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 
 			        sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+
+			        if [[ $ALLREDUCE_ALG == "ring" ]];then
+			        	sed -i "s|STPRIO .*|STPRIO 1|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			        else
+			        	sed -i "s|STPRIO .*|STPRIO 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			        fi
 			    done
 			done
 		done
@@ -157,6 +163,12 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			        sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 
 			        sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+
+			        if [[ $ALLREDUCE_ALG == "ring" ]];then
+			        	sed -i "s|STPRIO .*|STPRIO 1|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			        else
+			        	sed -i "s|STPRIO .*|STPRIO 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			        fi
 			    done
 			done
 		done
@@ -179,6 +191,12 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 
 			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+
+			    if [[ $ALLREDUCE_ALG == "ring" ]];then
+		        	sed -i "s|STPRIO .*|STPRIO 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+		        else
+		        	sed -i "s|STPRIO .*|STPRIO 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+		        fi
 			done
 		done
 	done
@@ -200,6 +218,12 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 
 			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+
+			    if [[ $ALLREDUCE_ALG == "ring" ]];then
+		        	sed -i "s|STPRIO .*|STPRIO 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+		        else
+		        	sed -i "s|STPRIO .*|STPRIO 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+		        fi
 			done
 		done
 	done
