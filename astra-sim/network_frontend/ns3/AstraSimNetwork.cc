@@ -581,7 +581,8 @@ string comm_group_configuration = "empty";
 string logical_topology_configuration;
 string logging_configuration = "empty";
 int num_queues_per_dim = 1;
-double comm_scale = 1;
+double comm_scale = 0.001;
+double comp_scale = 0.001;
 double injection_scale = 1;
 bool rendezvous_protocol = false;
 auto logical_dims = vector<int>();
@@ -644,6 +645,7 @@ void parse_args(int argc, char* argv[]) {
     cmd.AddValue("num-queues-per-dim", "Number of queues per each dimension",
                  num_queues_per_dim);
     cmd.AddValue("comm-scale", "Communication scale", comm_scale);
+    cmd.AddValue("comp-scale", "Compute scale", comp_scale);
     cmd.AddValue("injection-scale", "Injection scale", injection_scale);
     cmd.AddValue("rendezvous-protocol", "Whether to enable rendezvous protocol",
                  rendezvous_protocol);
@@ -674,6 +676,7 @@ int main(int argc, char* argv[]) {
             npu_id, workload_configuration, comm_group_configuration,
             system_configuration, mem, networks[npu_id], logical_dims,
             queues_per_dim, injection_scale, comm_scale, rendezvous_protocol);
+        systems[npu_id]->comp_scale = comp_scale;
 
         // STyGIANet
         if (networks[npu_id]->etherealEnabled()) {

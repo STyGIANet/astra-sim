@@ -326,6 +326,8 @@ class Sys : public Callable {
 
     // skip simulation for all nodes and use current duration
     bool replay_only;
+
+    double comp_scale;
 };
 
 }  // namespace AstraSim

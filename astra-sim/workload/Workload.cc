@@ -161,7 +161,13 @@ void Workload::issue(shared_ptr<Chakra::ETFeederNode> node) {
                                   static_cast<uint64_t>(node->type()));
                 }
             }
-            issue_comm(node);
+            std::cout << "CommSize = " << node->comm_size() << " name " << node->name() << std::endl;
+            if(node->comm_size()==0){
+                skip_invalid(node);
+            }
+            else{
+                issue_comm(node);
+            }
         } else if (node->type() == ChakraNodeType::INVALID_NODE) {
             skip_invalid(node);
         }
@@ -172,10 +178,10 @@ void Workload::issue_replay(shared_ptr<Chakra::ETFeederNode> node) {
     WorkloadLayerHandlerData* wlhd = new WorkloadLayerHandlerData;
     wlhd->node_id = node->id();
     uint64_t runtime = 1ul;
-    if (node->runtime() != 0ul) {
+    if (uint64_t(node->runtime()*(sys->comp_scale)) != 0ul) {
         // chakra runtimes are in microseconds and we should convert it into
         // nanoseconds
-        runtime = node->runtime() * 1000;
+        runtime = uint64_t(node->runtime()*(sys->comp_scale)) * 1000;
     }
     if (node->is_cpu_op()) {
         hw_resource->tics_cpu_ops += runtime;
@@ -260,7 +266,7 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
         (node->type() == ChakraNodeType::COMM_COLL_NODE)) {
         if (node->comm_type() == ChakraCollectiveCommType::ALL_REDUCE) {
             DataSet* fp =
-                sys->generate_all_reduce(node->comm_size(), involved_dim,
+                sys->generate_all_reduce(uint64_t((sys->comm_scale)*(node->comm_size())), involved_dim,
                                          comm_group, node->comm_priority());
             collective_comm_node_id_map[fp->my_id] = node->id();
             collective_comm_wrapper_map[fp->my_id] = fp;
@@ -268,7 +274,7 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
 
         } else if (node->comm_type() == ChakraCollectiveCommType::ALL_TO_ALL) {
             DataSet* fp =
-                sys->generate_all_to_all(node->comm_size(), involved_dim,
+                sys->generate_all_to_all(uint64_t((sys->comm_scale)*(node->comm_size())), involved_dim,
                                          comm_group, node->comm_priority());
             collective_comm_node_id_map[fp->my_id] = node->id();
             collective_comm_wrapper_map[fp->my_id] = fp;
@@ -276,7 +282,7 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
 
         } else if (node->comm_type() == ChakraCollectiveCommType::ALL_GATHER) {
             DataSet* fp =
-                sys->generate_all_gather(node->comm_size(), involved_dim,
+                sys->generate_all_gather(uint64_t((sys->comm_scale)*(node->comm_size())), involved_dim,
                                          comm_group, node->comm_priority());
             collective_comm_node_id_map[fp->my_id] = node->id();
             collective_comm_wrapper_map[fp->my_id] = fp;
@@ -285,7 +291,7 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
         } else if (node->comm_type() ==
                    ChakraCollectiveCommType::REDUCE_SCATTER) {
             DataSet* fp =
-                sys->generate_reduce_scatter(node->comm_size(), involved_dim,
+                sys->generate_reduce_scatter(uint64_t((sys->comm_scale)*(node->comm_size())), involved_dim,
                                              comm_group, node->comm_priority());
             collective_comm_node_id_map[fp->my_id] = node->id();
             collective_comm_wrapper_map[fp->my_id] = fp;
@@ -320,7 +326,7 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
         sehd->wlhd = new WorkloadLayerHandlerData;
         sehd->wlhd->node_id = node->id();
         sehd->event = EventType::PacketSent;
-        sys->front_end_sim_send(0, Sys::dummy_data, node->comm_size(), UINT8,
+        sys->front_end_sim_send(0, Sys::dummy_data, uint64_t((sys->comm_scale)*(node->comm_size())), UINT8,
                                 node->comm_dst(), node->comm_tag(), &snd_req,
                                 Sys::FrontEndSendRecvType::NATIVE,
                                 &Sys::handleEvent, sehd);
@@ -331,7 +337,7 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
         rcehd->wlhd->node_id = node->id();
         rcehd->workload = this;
         rcehd->event = EventType::PacketReceived;
-        sys->front_end_sim_recv(0, Sys::dummy_data, node->comm_size(), UINT8,
+        sys->front_end_sim_recv(0, Sys::dummy_data, uint64_t((sys->comm_scale)*(node->comm_size())), UINT8,
                                 node->comm_src(), node->comm_tag(), &rcv_req,
                                 Sys::FrontEndSendRecvType::NATIVE,
                                 &Sys::handleEvent, rcehd);

@@ -7,17 +7,22 @@ source config.sh
 
 NODES=(256)
 MSG_SIZES=(1000000 2000000 4000000 8000000 16000000 32000000 64000000 128000000 256000000)
-TXT_WORKLOADS=("DLRM_HybridParallel" "Resnet50_DataParallel" "MLP_HybridParallel_Data_Model")
+# TXT_WORKLOADS=("DLRM_HybridParallel" "Resnet50_DataParallel" "MLP_HybridParallel_Data_Model")
+TXT_WORKLOADS=("Gpt_7B" "Gpt_13B")
 ALLREDUCE_ALGS=("direct" "halvingDoubling")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
 ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "reps" "spray" "none")
 
+# ALLREDUCE_ALGS=("ring")
+# ALGS=("none")
+COMP_SCALE=1
+COMM_SCALE=1
 # Recompile ns3
-cd ${SCRIPT_DIR}
-./build.sh -l
-./build.sh -c
+# cd ${SCRIPT_DIR}
+# ./build.sh -l
+# ./build.sh -c
 #################################################################################
 # leaf-spine topology with 256 nodes
 # Various workloads and load balancing algorithms
@@ -63,7 +68,6 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			MEMORY=${MEMORY_DIR}/remote_memory.json
 			LOGICAL_TOPOLOGY=${LOGICAL_TOPO_DIR}/logical-topo-$NUM_NODES.json
 			OUTPUT_FILE=${RESULTS_DIR}/AllReduce-$NUM_NODES-$TXT_WORKLOAD-leaf-spine-$ALG-$ALLREDUCE_ALG.out
-
 			cd ${PROJECT_DIR}
 			if [[ $EXP == 1 ]];then
 				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
@@ -72,10 +76,13 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 				        --network-configuration=${NETWORK} \
 				        --remote-memory-configuration=${MEMORY} \
 				        --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
-				        --comm-group-configuration=\"empty\" > ${OUTPUT_FILE} 2> ${OUTPUT_FILE})&
+				        --comm-group-configuration=\"empty\" \
+				        --comp-scale=${COMP_SCALE} \
+				        --comm-scale=${COMM_SCALE} \
+				        	> ${OUTPUT_FILE} 2> ${OUTPUT_FILE}; echo "Finished ${OUTPUT_FILE}")&
 			sleep 2
 			fi
-			echo "$NETWORK"
+			echo "Started ${OUTPUT_FILE}"
 			N=$(( $N+1 ))
 		done
 	done
