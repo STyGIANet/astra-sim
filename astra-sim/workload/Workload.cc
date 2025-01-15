@@ -161,8 +161,8 @@ void Workload::issue(shared_ptr<Chakra::ETFeederNode> node) {
                                   static_cast<uint64_t>(node->type()));
                 }
             }
-            std::cout << "CommSize = " << node->comm_size() << " name " << node->name() << std::endl;
-            if(node->comm_size()==0){
+            std::cout << "CommSize " << node->comm_size() << " name " << node->name() << " rank " << node->id() << " time " << sys->comm_NI->sim_get_time().time_val << std::endl;
+            if(node->comm_size()==0 || node->comm_size()/sys->total_nodes == 0){
                 skip_invalid(node);
             }
             else{
@@ -181,7 +181,11 @@ void Workload::issue_replay(shared_ptr<Chakra::ETFeederNode> node) {
     if (uint64_t(node->runtime()*(sys->comp_scale)) != 0ul) {
         // chakra runtimes are in microseconds and we should convert it into
         // nanoseconds
-        runtime = uint64_t(node->runtime()*(sys->comp_scale)) * 1000;
+        // std::cout << "Compute time " << node->runtime() << std::endl;
+        // std::exit(1);
+        // runtime = uint64_t(node->runtime()*(sys->comp_scale)) * 1000;
+        // no need to multiply with 1000 when using text workloads. They are already in nanoseconds (At least how SimAI is using it)
+        runtime = uint64_t(node->runtime()*(sys->comp_scale));
     }
     if (node->is_cpu_op()) {
         hw_resource->tics_cpu_ops += runtime;
