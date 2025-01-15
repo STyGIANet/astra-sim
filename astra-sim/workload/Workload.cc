@@ -161,7 +161,7 @@ void Workload::issue(shared_ptr<Chakra::ETFeederNode> node) {
                                   static_cast<uint64_t>(node->type()));
                 }
             }
-            std::cout << "CommSize " << node->comm_size() << " name " << node->name() << " rank " << sys->id() << " time " << sys->comm_NI->sim_get_time().time_val << std::endl;
+            std::cout << "CommSize " << node->comm_size() << " name " << node->name() << " rank " << sys->id << " time " << sys->comm_NI->sim_get_time().time_val << std::endl;
             if(node->comm_size()==0 || node->comm_size()/sys->total_nodes == 0){
                 skip_invalid(node);
             }
