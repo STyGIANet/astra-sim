@@ -9,6 +9,7 @@ LICENSE file in the root directory of this source tree.
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "astra-sim/system/Callable.hh"
 #include "astra-sim/system/CommunicatorGroup.hh"
@@ -51,6 +52,11 @@ class Workload : public Callable {
     std::unordered_map<int, uint64_t> collective_comm_node_id_map;
     std::unordered_map<int, DataSet*> collective_comm_wrapper_map;
     bool is_finished;
+
+    static int collectiveBarrier[1024];
+    static std::vector<Workload*> allWorkloads;
+
+    void releaseBarrier(int id);
 };
 
 }  // namespace AstraSim

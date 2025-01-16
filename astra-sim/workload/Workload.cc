@@ -25,6 +25,9 @@ using json = nlohmann::json;
 typedef ChakraProtoMsg::NodeType ChakraNodeType;
 typedef ChakraProtoMsg::CollectiveCommType ChakraCollectiveCommType;
 
+int Workload::collectiveBarrier[1024] = {0};
+std::vector<Workload*> Workload::allWorkloads;
+
 Workload::Workload(Sys* sys, string et_filename, string comm_group_filename) {
     string workload_filename = et_filename + "." + to_string(sys->id) + ".et";
     // Check if workload filename exists
@@ -50,6 +53,8 @@ Workload::Workload(Sys* sys, string et_filename, string comm_group_filename) {
     this->sys = sys;
     initialize_comm_group(comm_group_filename);
     this->is_finished = false;
+
+    allWorkloads.push_back(this);
 }
 
 Workload::~Workload() {
@@ -62,11 +67,13 @@ Workload::~Workload() {
     if (this->hw_resource != nullptr) {
         delete this->hw_resource;
     }
+    allWorkloads.erase(remove(allWorkloads.begin(), allWorkloads.end(), this), allWorkloads.end());
 }
 
 void Workload::initialize_comm_group(string comm_group_filename) {
     // communicator group input file is not given
     if (comm_group_filename.find("empty") != std::string::npos) {
+        collectiveBarrier[0] = 0;
         comm_group = nullptr;
         return;
     }
@@ -75,6 +82,8 @@ void Workload::initialize_comm_group(string comm_group_filename) {
     json j;
     inFile.open(comm_group_filename);
     inFile >> j;
+
+    uint64_t groupId = 1;
 
     for (json::iterator it = j.begin(); it != j.end(); ++it) {
         bool in_comm_group = false;
@@ -90,10 +99,12 @@ void Workload::initialize_comm_group(string comm_group_filename) {
             for (auto id : it.value()) {
                 involved_NPUs.push_back(id);
             }
-            comm_group = new CommunicatorGroup(1, involved_NPUs, sys);
+            comm_group = new CommunicatorGroup(groupId, involved_NPUs, sys);
+            collectiveBarrier[groupId] = 0;
             // Note: All NPUs should create comm group with identical ids if
             // they want to communicate with each other
         }
+        groupId++;
     }
     inFile.close();
 }
@@ -161,7 +172,7 @@ void Workload::issue(shared_ptr<Chakra::ETFeederNode> node) {
                                   static_cast<uint64_t>(node->type()));
                 }
             }
-            std::cout << "CommSize " << node->comm_size() << " name " << node->name() << " rank " << sys->id << " time " << sys->comm_NI->sim_get_time().time_val << std::endl;
+            std::cout << "Collective Started: Size " << node->comm_size() << " name " << node->name() << " rank " << sys->id << " time " << sys->comm_NI->sim_get_time().time_val << std::endl;
             if(node->comm_size()==0 || node->comm_size()/sys->total_nodes == 0){
                 skip_invalid(node);
             }
@@ -268,6 +279,12 @@ void Workload::issue_comm(shared_ptr<Chakra::ETFeederNode> node) {
 
     if (!node->is_cpu_op() &&
         (node->type() == ChakraNodeType::COMM_COLL_NODE)) {
+        if (comm_group == nullptr){
+            collectiveBarrier[0]++;
+        }
+        else{
+            collectiveBarrier[comm_group->get_id()]++;
+        }
         if (node->comm_type() == ChakraCollectiveCommType::ALL_REDUCE) {
             DataSet* fp =
                 sys->generate_all_reduce(uint64_t((sys->comm_scale)*(node->comm_size())), involved_dim,
@@ -357,6 +374,17 @@ void Workload::skip_invalid(shared_ptr<Chakra::ETFeederNode> node) {
     et_feeder->removeNode(node->id());
 }
 
+// Not thread safe. Needs additional care when running on multiple cores
+void Workload::releaseBarrier(int id){
+    if (collectiveBarrier[id]!=0)
+        return;
+    // ToDO: Only call the workloads that are in the same comm group
+    for (auto w : allWorkloads){
+        if (w != this)
+            w->call(EventType::General, nullptr);
+    }
+}
+
 void Workload::call(EventType event, CallData* data) {
     if (is_finished) {
         return;
@@ -375,12 +403,28 @@ void Workload::call(EventType event, CallData* data) {
                         sys->id, Sys::boostedTick(), node->id(), node->name(),
                         static_cast<uint64_t>(node->type()));
         }
+        std::cout << "Collective Finished: Size " << node->comm_size() << " name " << node->name() << " rank " << sys->id << " time " << sys->comm_NI->sim_get_time().time_val << std::endl;
 
         hw_resource->release(node);
 
         et_feeder->freeChildrenNodes(node_id);
 
-        issue_dep_free_nodes();
+        // issue_dep_free_nodes();
+        
+        if (comm_group == nullptr){
+            collectiveBarrier[0] >0 ? collectiveBarrier[0]-- : 0;
+            releaseBarrier(0);
+            if (collectiveBarrier[0] == 0){
+                issue_dep_free_nodes();
+            }
+        }
+        else{
+            collectiveBarrier[comm_group->get_id()] >0 ? collectiveBarrier[comm_group->get_id()]-- : 0;
+            releaseBarrier(comm_group->get_id());
+            if (collectiveBarrier[comm_group->get_id()] == 0){
+                issue_dep_free_nodes();
+            }
+        }
 
         et_feeder->removeNode(node_id);
 
@@ -392,6 +436,16 @@ void Workload::call(EventType event, CallData* data) {
     } else {
         if (data == nullptr) {
             issue_dep_free_nodes();
+            // if (comm_group == nullptr){
+            //     if (collectiveBarrier[0] == 0){
+            //         issue_dep_free_nodes();
+            //     }
+            // }
+            // else{
+            //     if (collectiveBarrier[comm_group->get_id()] == 0){
+            //         issue_dep_free_nodes();
+            //     }
+            // }
         } else {
             WorkloadLayerHandlerData* wlhd = (WorkloadLayerHandlerData*)data;
             shared_ptr<Chakra::ETFeederNode> node =
@@ -410,6 +464,17 @@ void Workload::call(EventType event, CallData* data) {
             et_feeder->freeChildrenNodes(node->id());
 
             issue_dep_free_nodes();
+
+            // if (comm_group == nullptr){
+            //     if (collectiveBarrier[0] == 0){
+            //         issue_dep_free_nodes();
+            //     }
+            // }
+            // else{
+            //     if (collectiveBarrier[comm_group->get_id()] == 0){
+            //         issue_dep_free_nodes();
+            //     }
+            // }
 
             et_feeder->removeNode(wlhd->node_id);
             delete wlhd;
