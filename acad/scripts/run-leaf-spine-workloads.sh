@@ -14,7 +14,6 @@ ALLREDUCE_ALGS=("direct" "halvingDoubling")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
-# "mp-rdma-8" is eating up RAM :/
 ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "reps" "spray" "none")
 
 COMP_SCALE=1
@@ -79,8 +78,8 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 				        --comm-group-configuration=\"empty\" \
 				        --comp-scale=${COMP_SCALE} \
 				        --comm-scale=${COMM_SCALE} \
-				        	> ${OUTPUT_FILE} 2> ${OUTPUT_FILE}; echo "Finished ${OUTPUT_FILE}")&
-				# (valgrind --leak-check=full "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
+			        	> ${OUTPUT_FILE} 2> ${OUTPUT_FILE}; echo "Finished ${OUTPUT_FILE}")&
+				# (heaptrack "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
 				#         --workload-configuration=${WORKLOAD} \
 				#         --system-configuration=${SYSTEM} \
 				#         --network-configuration=${NETWORK} \
