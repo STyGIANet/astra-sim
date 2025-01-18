@@ -137,16 +137,25 @@ void send_flow(int src_id, int dst, int maxPacketCount,
       make_pair(make_pair(tag, make_pair(send_event.src_id, send_event.dst_id)),port) ;
   sim_send_waiting_hash[send_event_key] = send_event;
 
+  Ptr<Node> node = n.Get(src_id);
+  Ptr<RdmaDriver> rdma = node->GetObject<RdmaDriver>();
+  rdma->AddQueuePair(src_id, dst, 
+                    tag, maxPacketCount, pg, 
+                    serverAddress[src_id], serverAddress[dst],
+                    port, dport, 
+                    has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)]): 0,
+                    global_t == 1 ? maxRtt : pairRtt[src_id][dst],
+                    MakeNullCallback<void>(), MakeNullCallback<void>());
   // Create a queue pair and schedule within the ns3 simulator.
-  RdmaClientHelper clientHelper(
-      pg, serverAddress[src_id], serverAddress[dst], port, dport,
-      maxPacketCount,
-      has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)])
-              : 0,
-      global_t == 1 ? maxRtt : pairRtt[src_id][dst], msg_handler, fun_arg, tag,
-      src_id, dst);
-  ApplicationContainer appCon = clientHelper.Install(n.Get(src_id));
-  appCon.Start(Time(0));
+  // RdmaClientHelper clientHelper(
+  //     pg, serverAddress[src_id], serverAddress[dst], port, dport,
+  //     maxPacketCount,
+  //     has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)])
+  //             : 0,
+  //     global_t == 1 ? maxRtt : pairRtt[src_id][dst], msg_handler, fun_arg, tag,
+  //     src_id, dst);
+  // ApplicationContainer appCon = clientHelper.Install(n.Get(src_id));
+  // appCon.Start(Time(0));
 }
 
 // send_flow commands the ns3 simulator to schedule a RDMA message to be sent
@@ -169,16 +178,27 @@ void send_flow(int src_id, int dst, int maxPacketCount,
       make_pair(make_pair(tag, make_pair(send_event.src_id, send_event.dst_id)),port) ;
   sim_send_waiting_hash[send_event_key] = send_event;
 
+
+  Ptr<Node> node = n.Get(src_id);
+  Ptr<RdmaDriver> rdma = node->GetObject<RdmaDriver>();
+  rdma->AddQueuePair(src_id, dst, 
+                    tag, maxPacketCount, pg, 
+                    serverAddress[src_id], serverAddress[dst],
+                    port, dport, 
+                    has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)]): 0,
+                    global_t == 1 ? maxRtt : pairRtt[src_id][dst],
+                    MakeNullCallback<void>(), MakeNullCallback<void>());
+
   // Create a queue pair and schedule within the ns3 simulator.
-  RdmaClientHelper clientHelper(
-      pg, serverAddress[src_id], serverAddress[dst], port, dport,
-      maxPacketCount,
-      has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)])
-              : 0,
-      global_t == 1 ? maxRtt : pairRtt[src_id][dst], msg_handler, fun_arg, tag,
-      src_id, dst);
-  ApplicationContainer appCon = clientHelper.Install(n.Get(src_id));
-  appCon.Start(Time(0));
+  // RdmaClientHelper clientHelper(
+  //     pg, serverAddress[src_id], serverAddress[dst], port, dport,
+  //     maxPacketCount,
+  //     has_win ? (global_t == 1 ? maxBdp : pairBdp[n.Get(src_id)][n.Get(dst)])
+  //             : 0,
+  //     global_t == 1 ? maxRtt : pairRtt[src_id][dst], msg_handler, fun_arg, tag,
+  //     src_id, dst);
+  // ApplicationContainer appCon = clientHelper.Install(n.Get(src_id));
+  // appCon.Start(Time(0));
 }
 
 // notify_receiver_receive_data looks at whether the System layer has issued
