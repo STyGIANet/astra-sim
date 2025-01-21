@@ -15,7 +15,8 @@ APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
 ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "reps" "spray" "none")
-
+# ALGS=("reps")
+# ALLREDUCE_ALGS=("direct")
 COMP_SCALE=1
 COMM_SCALE=1
 # Recompile ns3
