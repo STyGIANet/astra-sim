@@ -649,6 +649,7 @@ void parse_args(int argc, char* argv[]) {
     cmd.AddValue("injection-scale", "Injection scale", injection_scale);
     cmd.AddValue("rendezvous-protocol", "Whether to enable rendezvous protocol",
                  rendezvous_protocol);
+    cmd.AddValue("linkFailure", "whether to simulate link failure, 1=Failure, 0=normal", link_failure);
 
     cmd.Parse(argc, argv);
 }
