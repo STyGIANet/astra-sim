@@ -120,8 +120,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         if (numFailedPaths[dst_tor] > 0) {
             numFailedPaths[dst_tor]--;
         }
-        if (pathMatrix[dst_tor][uplink].IsPending()) {
-            pathMatrix[dst_tor][uplink].Remove();
+        if (pathMatrix[dst_tor][u].IsPending()) {
+            pathMatrix[dst_tor][u].Remove();
         }
     }
 

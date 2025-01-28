@@ -13,7 +13,6 @@ APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
 ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "reps" "spray" "none")
-
 # Recompile ns3
 cd ${SCRIPT_DIR}
 ./build.sh -l
@@ -82,7 +81,8 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 				#         --network-configuration=${NETWORK} \
 				#         --remote-memory-configuration=${MEMORY} \
 				#         --logical-topology-configuration=${LOGICAL_TOPOLOGY} \
-				#         --comm-group-configuration=\"empty\"
+				#         --comm-group-configuration=\"empty\"\
+				#         --linkFailure=1
 
 				# (time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
 				#         --workload-configuration=${WORKLOAD} \
