@@ -12,7 +12,8 @@ ALLREDUCE_ALGS=("direct" "halvingDoubling")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
 ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
 
-ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "reps" "spray" "none")
+# ECMP and mp-rdma-x are not terminating at all due to failures, removing it.
+ALGS=("ethereal" "reps" "spray")
 
 # Recompile ns3
 cd ${SCRIPT_DIR}
