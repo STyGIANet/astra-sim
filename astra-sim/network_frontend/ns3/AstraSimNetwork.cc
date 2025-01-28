@@ -94,13 +94,13 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         } else {
             u = (uplink & 0x00FF) * nTorsPerPod + ((uint16_t)(uplink)) >> 8;
         }
+        // std::cout << u << " " << uplink << " " << dst << " " << pathMatrix[dst_tor].size() << std::endl;
         NS_ASSERT_MSG(u < pathMatrix[dst_tor].size(),
                       "Invalid uplink index");
-        if (pathMatrix[dst_tor][u].IsPending()) {
-            pathMatrix[dst_tor][u].Remove();
-        } else {
+        if (!pathMatrix[dst_tor][u].IsPending()) {
             numFailedPaths[dst_tor]++;
         }
+        pathMatrix[dst_tor][u].Remove();
         pathMatrix[dst_tor][u] = Simulator::Schedule(
             NanoSeconds(failedPathResetTimeOut),
             &ASTRASimNetwork::resetLinkFailure, this, uplink, dst);
@@ -120,9 +120,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         if (numFailedPaths[dst_tor] > 0) {
             numFailedPaths[dst_tor]--;
         }
-        if (pathMatrix[dst_tor][u].IsPending()) {
-            pathMatrix[dst_tor][u].Remove();
-        }
+        pathMatrix[dst_tor][u].Remove();
     }
 
     void set_topo_params(uint32_t t1l,
