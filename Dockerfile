@@ -84,8 +84,31 @@ RUN pip3 install protobuf==5.${PROTOBUF_VER}
 ENV PROTOBUF_FROM_SOURCE=True
 ### ======================================================
 
+### =============== Create non-root user ================
+# password-less sudo
+RUN apt-get install -y sudo && mkdir -p /etc/sudoers.d
+ARG USERNAME=astra
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME \
+    && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+RUN echo 'alias builddir="cd /app/astra-sim/build/astra_ns3/"' >> /home/$USERNAME/.bashrc && \
+echo 'alias scratchdir="cd /app/astra-sim/extern/network_backend/ns-3/scratch/"' >> /home/$USERNAME/.bashrc && \
+chown astra:astra /home/astra/.bashrc
+
+# Switch to non-root user
+USER $USERNAME
+
+### =====================================================
 
 ### ================== Finalize ==========================
+# Loglevel info for development
+ENV NS_LOG="*=info"
+
 ## Move to the application directory
 WORKDIR /app/astra-sim
 ### ======================================================

@@ -6,12 +6,14 @@ SCRIPT_DIR=$(dirname "$(realpath $0)")
 ASTRA_SIM_DIR="${SCRIPT_DIR:?}"/../../astra-sim
 NS3_DIR="${SCRIPT_DIR:?}"/../../extern/network_backend/ns-3
 # Inputs - change as necessary.
-WORKLOAD="${SCRIPT_DIR:?}"/../../extern/graph_frontend/chakra/one_comm_coll_node_allgather # use chakra
+WORKLOAD="${SCRIPT_DIR:?}"/../../examples/network_analytical/workload/AllReduce_1MB
+#WORKLOAD="${SCRIPT_DIR:?}"/../../extern/graph_frontend/chakra/one_comm_coll_node_allgather
 SYSTEM="${SCRIPT_DIR:?}"/../../examples/ns3/system.json
 MEMORY="${SCRIPT_DIR:?}"/../../examples/ns3/remote_memory.json
-LOGICAL_TOPOLOGY="${SCRIPT_DIR:?}"/../../examples/ns3/sample_8nodes_1D.json
+LOGICAL_TOPOLOGY="${SCRIPT_DIR:?}"/../../examples/ns3/sample_3nodes_1D.json
+#LOGICAL_TOPOLOGY="${SCRIPT_DIR:?}"/../../inputs/network/ns3/sample_8nodes_1D.json
 # Note that ONLY this file is relative to NS3_DIR/simulation
-NETWORK="../../../ns-3/scratch/config/config.txt"
+NETWORK="../../../ns-3/scratch/config/config_ocs.txt"
 # Functions
 function setup {
     protoc et_def.proto\
@@ -21,7 +23,7 @@ function setup {
 function compile {
     cd "${NS3_DIR}"
     ./ns3 configure --enable-mpi
-    ./ns3 build AstraSimNetwork -j $(nproc)
+    ./ns3 build AstraSimNetwork -j 12
     cd "${SCRIPT_DIR:?}"
 }
 function run {
