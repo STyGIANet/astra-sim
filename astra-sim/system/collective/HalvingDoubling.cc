@@ -4,6 +4,7 @@ LICENSE file in the root directory of this source tree.
 *******************************************************************************/
 
 #include "astra-sim/system/collective/HalvingDoubling.hh"
+#include "astra-sim/system/scheduling/ReconfigSched.h"
 
 #include <cmath>
 #include <iostream>
@@ -157,6 +158,7 @@ void HalvingDoubling::process_max_count() {
         remained_packets_per_max_count--;
     }
     if (remained_packets_per_max_count == 0) {
+        // finished the previous round
         max_count--;
         release_packets();
         remained_packets_per_max_count = 1;
@@ -246,6 +248,13 @@ bool HalvingDoubling::ready() {
         return false;
     }
     MyPacket packet = packets.front();
+    //TODO calc round number
+
+    int curRoundNum = 0;
+    reconfigSched& sched = reconfigSched::getScheduler();
+    bool isReconfiguring = sched.reconfig(this, curRoundNum, packet.msg_size);
+    Tick delay = isReconfiguring ? 0 : sched.getReconfigDelay();
+
     sim_request snd_req;
     snd_req.srcRank = id;
     snd_req.dstRank = packet.preferred_dest;
@@ -253,7 +262,7 @@ bool HalvingDoubling::ready() {
     snd_req.reqType = UINT8;
     snd_req.vnet = this->stream->current_queue_id;
     stream->owner->front_end_sim_send(
-        0, Sys::dummy_data, packet.msg_size, UINT8, packet.preferred_dest,
+        delay, Sys::dummy_data, packet.msg_size, UINT8, packet.preferred_dest,
         stream->stream_id, &snd_req, Sys::FrontEndSendRecvType::COLLECTIVE,
         &Sys::handleEvent,
         nullptr);  // stream_id+(packet.preferred_dest*50)

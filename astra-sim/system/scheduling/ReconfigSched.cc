@@ -18,9 +18,12 @@ reconfigSched& reconfigSched::getScheduler()
 
 
 reconfigSched::reconfigSched()
-  :  m_ocs (nullptr), m_bandwidthBps (0)
+  :  m_ocs (nullptr), m_bandwidthBps (0), m_isDemandAware(false)
 {}
 
+reconfigSched::~reconfigSched(){
+    m_ocs->Unref(); //decrease ref count, which is incremented on assignement during SetupNetwork()
+}
 
 void
 reconfigSched::setOCSNode(OCSNode* ocs)
@@ -47,14 +50,14 @@ reconfigSched::setMatchings(const Algorithm* algo, int rootNodeId)
         // check if this really applies for all ComTypes in HalvingDoubling
         // its source code suggests it doesn't always create pairs like this
 
-        uint64_t num = hd->nodes_in_ring;
+        int num = (int) hd->nodes_in_ring;
         int R = reconfigSched::ceil_log2(num);
         int maxRounds = (hd->comType == ComType::All_Reduce) ? R * 2 : R;
 
 
         if ( !( (1u << R) == num) ){
             // further calculations are based on assumption of nodeNum == 2^roundNum
-            printf("ReconfigSched = Number of nodes is not a power of 2.");
+            printf("ReconfigSched: Number of nodes is not a power of 2.");
         }
 
         // important assumption: For all ports at OCS: portNum == connected Node Id
@@ -74,6 +77,18 @@ reconfigSched::setMatchings(const Algorithm* algo, int rootNodeId)
     else{
         //TODO implement other algos
     }
+}
+
+void 
+reconfigSched::setDaMode(bool isDemandAware)
+{
+    m_isDemandAware = isDemandAware;
+}
+
+bool 
+reconfigSched::getDaMode()
+{
+    return m_isDemandAware;
 }
 
 const std::map<uint32_t, uint32_t>
@@ -101,7 +116,7 @@ reconfigSched::reconfig (const Algorithm* algo, int roundNum, uint64_t messageSi
   return false;
 }
 
-/* returns the delay in nanoseconds */
+// returns the delay in nanoseconds
 int64_t
 reconfigSched::getReconfigDelay()
 {
@@ -114,13 +129,14 @@ reconfigSched::calcCongestionFactor(const Algorithm* algo, int roundNum)
   if (dynamic_cast<const HalvingDoubling*>(algo)){
     return 1 << roundNum; // assumes roundNum is 0 indexed, distance == oversubscription in halving doubling
   }
-  // your algorithm-specific congestion logic
+  // algorithm-specific congestion logic
   return 0.0f;
 }
 
-/// Compute the hop distance for round `r` in a halving/doubling
-/// over `n` nodes for the given collective `type`.
-uint64_t halvingDoublingDist(int round, int nodes, AstraSim::ComType type)
+// Compute the hop distance for round `r` in a halving/doubling
+// over `n` nodes for the given collective `type`.
+uint64_t
+reconfigSched::halvingDoublingDist(int round, int nodes, AstraSim::ComType type)
 {
     int R = reconfigSched::ceil_log2(nodes);
 
@@ -142,7 +158,7 @@ uint64_t halvingDoublingDist(int round, int nodes, AstraSim::ComType type)
         return uint64_t(nodes) >> round;
 
       default:
-        // not a halving‐doubling variant
+        printf("ReconfigSched: Unknown Communication Type in halvingDoublingDist");
         return 0;
     }
 }
