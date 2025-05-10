@@ -60,16 +60,23 @@ reconfigSched::setMatchings(const Algorithm* algo, int rootNodeId)
             printf("ReconfigSched: Number of nodes is not a power of 2.");
         }
 
-        // important assumption: For all ports at OCS: portNum == connected Node Id
+        // important assumption: For all ports at OCS: portNum == connected NodeId and NodeId \in {0,1,...,n-1} continuous
         // TODO check/verify this assumption before continuing
 
         uint64_t dist = 0;
+        int logicalSrc, logicalDst;
+        bool clockwiseDirection;
         for (int curRound = 0; curRound < maxRounds; curRound++){
             dist = reconfigSched::halvingDoublingDist(curRound, num, hd->comType);
-
             for (int src = 0; src < num; src++){
-                int logicalSrc = (src - rootNodeId + num) % num; //shifting by rootNodeId
-                int logicalDst = (logicalSrc + dist) % num;
+                clockwiseDirection = ( src == 0 || (src / dist) % 2 == 0 );
+                logicalSrc = (src - rootNodeId + num) % num; //shifting by rootNodeId
+                if (clockwiseDirection){
+                    logicalDst = (logicalSrc + dist) % num;
+                }
+                else{ //counter clockwise
+                    logicalDst = (logicalSrc + num - dist ) % num;
+                }
                 m_allRoundsPortMaps[curRound][static_cast<uint32_t>(src)] = ((logicalDst + rootNodeId) % num);
             }
         }
@@ -95,9 +102,15 @@ const std::map<uint32_t, uint32_t>
 reconfigSched::roundToPortMap(int round)
 {
   auto it = m_allRoundsPortMaps.find(round);
-  return (it == m_allRoundsPortMaps.end ())
-       ? std::map<uint32_t, uint32_t>() 
-       : it->second;
+  if (it == m_allRoundsPortMaps.end ())
+  {
+    printf("Demand-Aware Reconfig: No portmap found for round %d", round);
+    return std::map<uint32_t, uint32_t>();
+  }
+  else
+  {
+    return it->second;
+  }
 }
 
 bool
@@ -106,7 +119,12 @@ reconfigSched::reconfig (const Algorithm* algo, int roundNum, uint64_t messageSi
   int64_t rDelayNs = getReconfigDelay();
 
 // TODO ensure messagesize in bits, or convert to bits; bandwdith is in bps.
-  if (rDelayNs < (m_bandwidthBps * messageSize) * (calcCongestionFactor(algo, roundNum) - 1)){
+  //if (rDelayNs < (m_bandwidthBps * messageSize) * (calcCongestionFactor(algo, roundNum) - 1)){
+  if (true){ //testing
+    if (m_allRoundsPortMaps.size() == 0)
+    {
+        setMatchings(algo,0); // unsure if rootNodeId ever changes
+    }
     m_ocs->Reconfigure(roundToPortMap(roundNum));
     // the callee has to ensure to wait until reconfiguration is done, until starting transmission
     // we don't do any blocking here
@@ -126,8 +144,9 @@ reconfigSched::getReconfigDelay()
 float
 reconfigSched::calcCongestionFactor(const Algorithm* algo, int roundNum)
 {
-  if (dynamic_cast<const HalvingDoubling*>(algo)){
-    return 1 << roundNum; // assumes roundNum is 0 indexed, distance == oversubscription in halving doubling
+  const HalvingDoubling* hd = dynamic_cast<const HalvingDoubling*>(algo);
+  if (hd != nullptr){
+    return halvingDoublingDist(roundNum,hd->nodes_in_ring,hd->comType); // distance == oversubscription in halving doubling
   }
   // algorithm-specific congestion logic
   return 0.0f;
