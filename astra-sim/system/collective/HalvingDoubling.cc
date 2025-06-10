@@ -45,6 +45,7 @@ HalvingDoubling::HalvingDoubling(ComType type,
     default:
         stream_count = log2(nodes_in_ring);
     }
+    this->total_rounds = stream_count;
     if (type == ComType::All_Gather) {
         max_count = 0;
     } else {
@@ -248,12 +249,12 @@ bool HalvingDoubling::ready() {
         return false;
     }
     MyPacket packet = packets.front();
-    //TODO calc round number
 
-    int curRoundNum = 0;
+    int curRoundNum = total_rounds - stream_count;
+
     reconfigSched& sched = reconfigSched::getScheduler();
     bool isReconfiguring = sched.reconfig(this, curRoundNum, packet.msg_size);
-    Tick delay = isReconfiguring ? 0 : sched.getReconfigDelay();
+    Tick delay = isReconfiguring ? sched.getReconfigDelay() : 0;
 
     sim_request snd_req;
     snd_req.srcRank = id;

@@ -42,6 +42,7 @@ class HalvingDoubling : public Algorithm {
     int curr_sender;
     int nodes_in_ring;
     int stream_count;
+    int total_rounds; //unchanged, whereas stream_count is decremented
     int max_count;
     int remained_packets_per_max_count;
     int remained_packets_per_message;
