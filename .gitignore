@@ -27,3 +27,9 @@ build/astra_garnet/result/
 
 # runs
 runs
+
+# python
+.venv/
+
+# param
+extern/graph_frontend/param/
