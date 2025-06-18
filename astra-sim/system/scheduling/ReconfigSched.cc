@@ -114,7 +114,7 @@ reconfigSched::roundToPortMap(int round)
 }
 
 bool
-reconfigSched::reconfig (const Algorithm* algo, int roundNum, uint64_t messageSize)
+reconfigSched::reconfigure (const Algorithm* algo, int roundNum, uint64_t messageSize)
 {
   int64_t rDelayNs = getReconfigDelay();
 
@@ -126,7 +126,7 @@ reconfigSched::reconfig (const Algorithm* algo, int roundNum, uint64_t messageSi
         setMatchings(algo,0); // unsure if rootNodeId ever changes
     }
     m_ocs->Reconfigure(roundToPortMap(roundNum));
-    // the callee has to ensure to wait until reconfiguration is done to start transmission, we don't do any blocking here
+    // the caller has to ensure to wait until reconfiguration is done until starting transmission, we don't do any blocking here
     return true;
   }
 

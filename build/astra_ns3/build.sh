@@ -13,7 +13,7 @@ MEMORY="${SCRIPT_DIR:?}"/../../examples/ns3/remote_memory.json
 LOGICAL_TOPOLOGY="${SCRIPT_DIR:?}"/../../examples/ns3/sample_4nodes_1D.json
 #LOGICAL_TOPOLOGY="${SCRIPT_DIR:?}"/../../inputs/network/ns3/sample_8nodes_1D.json
 # Note that ONLY this file is relative to NS3_DIR/simulation
-NETWORK="../../../ns-3/scratch/config/config_ocs.txt"
+NETWORK="../../../ns-3/scratch/config/config_ocs_static.txt"
 # Functions
 function setup {
     protoc et_def.proto\

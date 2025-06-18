@@ -31,7 +31,7 @@ class reconfigSched {
         / Returns the decision if to reconfigure for this round and instructs the OCS to reconfigure to the required portMap
         / if we reconfigure here, then the algorithm need to wait reconfigDelay ns before transmitting the next round
         */
-        bool reconfig(const Algorithm* algo, int roundNum, uint64_t messageSize);
+        bool reconfigure(const Algorithm* algo, int roundNum, uint64_t messageSize);
         int64_t getReconfigDelay (); // depends on ocsnode. Is called by algo so it knows when to schedule send for next round after reconfig
 
     private: 

@@ -7,10 +7,10 @@
         "halvingDoubling"
     ],
     "all-gather-implementation": [
-        "ring"
+        "halvingDoubling"
     ],
     "reduce-scatter-implementation": [
-        "ring"
+        "halvingDoubling"
     ],
     "all-to-all-implementation": [
         "ring"

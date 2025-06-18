@@ -248,14 +248,19 @@ bool HalvingDoubling::ready() {
     if (packets.size() == 0 || stream_count == 0 || free_packets == 0) {
         return false;
     }
+
     MyPacket packet = packets.front();
 
-    int curRoundNum = total_rounds - stream_count;
-
+    // optional demand-aware reconfiguration between rounds
     reconfigSched& sched = reconfigSched::getScheduler();
-    bool isReconfiguring = sched.reconfig(this, curRoundNum, packet.msg_size);
-    Tick delay = isReconfiguring ? sched.getReconfigDelay() : 0;
+    Tick delay = 0; // used to wait for reconfiguration to finish before sending
+    if (sched.getDaMode() == true){
+        int curRoundNum = total_rounds - stream_count;
+        bool isReconfiguring = sched.reconfigure(this, curRoundNum, packet.msg_size);
+        delay = isReconfiguring ? sched.getReconfigDelay() : 0;
+    }
 
+    // create and send flow
     sim_request snd_req;
     snd_req.srcRank = id;
     snd_req.dstRank = packet.preferred_dest;
