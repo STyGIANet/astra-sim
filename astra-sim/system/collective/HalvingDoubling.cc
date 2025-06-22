@@ -28,6 +28,7 @@ HalvingDoubling::HalvingDoubling(ComType type,
     this->parallel_reduce = 1;
     this->total_packets_sent = 0;
     this->total_packets_received = 0;
+    this->packets_received_this_round = 0;
     this->free_packets = 0;
     this->zero_latency_packets = 0;
     this->non_zero_latency_packets = 0;
@@ -112,6 +113,8 @@ void HalvingDoubling::run(EventType event, CallData* data) {
         iteratable();
     } else if (event == EventType::PacketReceived) {
         total_packets_received++;
+        // wait for all flows of this round to finish before starting next round
+        // especially important when simulating congestion with sequential flows
         insert_packet(nullptr);
     } else if (event == EventType::StreamInit) {
         for (int i = 0; i < parallel_reduce; i++) {

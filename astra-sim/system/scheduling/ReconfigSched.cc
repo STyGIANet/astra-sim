@@ -18,7 +18,7 @@ reconfigSched& reconfigSched::getScheduler()
 
 
 reconfigSched::reconfigSched()
-  :  m_ocs (nullptr), m_bandwidthBps (0), m_isDemandAware(false)
+  :  m_ocs (nullptr), m_bandwidthBps (0), m_isDemandAware(false), m_syncRoundsSeen(0)
 {}
 
 reconfigSched::~reconfigSched(){
@@ -37,6 +37,27 @@ reconfigSched::setBandwidth(uint64_t bps)
   m_bandwidthBps = bps;
 }
 
+bool reconfigSched::sync(const Algorithm* algo)
+{
+  m_syncRoundsSeen++;
+  bool allNodesSynced = true;
+
+  if (algo->name == Algorithm::Name::HalvingDoubling){
+      const HalvingDoubling* hd = dynamic_cast<const HalvingDoubling*>(algo);
+      if (hd == nullptr) {
+          printf("ReconfigSched: Collective Communication Algorithm Name and Typ mismatch. Something is wrong.");
+          exit(-707);
+      }
+
+      allNodesSynced = m_syncRoundsSeen >= hd->nodes_in_ring;
+      if (allNodesSynced){
+        m_syncRoundsSeen = 0; // new round
+      }
+  }
+
+  return allNodesSynced;
+}
+
 void
 reconfigSched::setMatchings(const Algorithm* algo, int rootNodeId)
 {
@@ -52,7 +73,7 @@ reconfigSched::setMatchings(const Algorithm* algo, int rootNodeId)
 
         int num = (int) hd->nodes_in_ring;
         int R = reconfigSched::ceil_log2(num);
-        int maxRounds = (hd->comType == ComType::All_Reduce) ? R * 2 : R;
+        int maxRounds = hd->total_rounds;
 
 
         if ( !( (1u << R) == num) ){

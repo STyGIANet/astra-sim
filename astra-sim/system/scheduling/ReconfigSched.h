@@ -27,6 +27,9 @@ class reconfigSched {
         void setDaMode(bool isDemandAware);
         bool getDaMode();
 
+        // For syncing rounds between nodes, not necessarily related to reconfiguration
+        bool sync(const Algorithm* algo);
+
         /* 
         / Returns the decision if to reconfigure for this round and instructs the OCS to reconfigure to the required portMap
         / if we reconfigure here, then the algorithm need to wait reconfigDelay ns before transmitting the next round
@@ -46,12 +49,14 @@ class reconfigSched {
         const std::map<uint32_t, uint32_t> roundToPortMap (int round);
 
         // data members
+
         static reconfigSched*                   m_instance; // singleton, there's only one instance of a reconfiguration Scheduler
         OCSNode*                                m_ocs; // reconfigSched controls the reconfiguration of exactly one OCS node. So we can get reconfigDelay directly from this, also to instruct OCS to reconfigure
         uint64_t                                m_bandwidthBps; // (uniform) link bandwidth in network topology, used for reconfigDecision. Set explicitely during SetupNetwork
         std::map<int, std::map<uint32_t, uint32_t>>     m_allRoundsPortMaps;     //assosciates the rounds of a coll. comm. algorithm with the node-to-node communication pair - which is a matching and hence a port mapping of our ocs
                                                     // for now we assume we're always operating with the same algo, later for multidimensional or 
         bool                                    m_isDemandAware; // whether demand-aware OCS is in use, otherwise demand-oblivious with static timetable and this scheduler isn't required
+        int                                     m_syncRoundsSeen; // how many nodes have already called sync for this round.
 };
 
 }  // namespace AstraSim
