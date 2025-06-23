@@ -126,7 +126,8 @@ enum class EventType {
     CollectiveCommunicationFinished,
     CompFinished,
     MemLoadFinished,
-    MemStoreFinished
+    MemStoreFinished,
+    SyncBarrier
 };
 
 class CloneInterface {

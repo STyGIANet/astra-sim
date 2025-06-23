@@ -3,8 +3,10 @@
 
 #include <cstdint>
 #include <map>
+#include <vector>
 #include "ns3/ocs-node.h"
 #include "astra-sim/system/collective/Algorithm.hh"
+#include "ns3/simulator.h"
 
 namespace AstraSim {
 
@@ -28,7 +30,8 @@ class reconfigSched {
         bool getDaMode();
 
         // For syncing rounds between nodes, not necessarily related to reconfiguration
-        bool sync(const Algorithm* algo);
+        //void registerAlgo(Algorithm* a); // every Algorithm must register itself exactly once, used to notify after syncing
+        bool sync(Algorithm* algo); // basically simple semaphore for N=number of nodes in this algo
 
         /* 
         / Returns the decision if to reconfigure for this round and instructs the OCS to reconfigure to the required portMap
@@ -57,6 +60,7 @@ class reconfigSched {
                                                     // for now we assume we're always operating with the same algo, later for multidimensional or 
         bool                                    m_isDemandAware; // whether demand-aware OCS is in use, otherwise demand-oblivious with static timetable and this scheduler isn't required
         int                                     m_syncRoundsSeen; // how many nodes have already called sync for this round.
+        std::vector<Algorithm*>                 m_algos; // all algos registered to this scheduler
 };
 
 }  // namespace AstraSim

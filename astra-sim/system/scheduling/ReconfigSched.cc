@@ -37,25 +37,31 @@ reconfigSched::setBandwidth(uint64_t bps)
   m_bandwidthBps = bps;
 }
 
-bool reconfigSched::sync(const Algorithm* algo)
+bool reconfigSched::sync(Algorithm* algo)
 {
+  // we only support HalvingDoubling for now
+  const HalvingDoubling* hd = dynamic_cast<const HalvingDoubling*>(algo);
+  NS_ASSERT_MSG(hd, "sync() only works on HalvingDoubling");
+
+  // register
+  m_algos.push_back(algo);
   m_syncRoundsSeen++;
-  bool allNodesSynced = true;
 
-  if (algo->name == Algorithm::Name::HalvingDoubling){
-      const HalvingDoubling* hd = dynamic_cast<const HalvingDoubling*>(algo);
-      if (hd == nullptr) {
-          printf("ReconfigSched: Collective Communication Algorithm Name and Typ mismatch. Something is wrong.");
-          exit(-707);
-      }
-
-      allNodesSynced = m_syncRoundsSeen >= hd->nodes_in_ring;
-      if (allNodesSynced){
-        m_syncRoundsSeen = 0; // new round
-      }
-  }
-
-  return allNodesSynced;
+  // once we've seen all ranks, fire exactly N SyncBarrier events
+  if (m_syncRoundsSeen >= hd->nodes_in_ring)
+  {
+    for (auto *a : m_algos)
+    {
+      ns3::Simulator::ScheduleNow([a](){
+        a->run(EventType::SyncBarrier, nullptr);
+        });
+        }
+      // 3) reset for next round
+      m_syncRoundsSeen = 0;
+      m_algos.clear();
+      return true;
+    }
+    return false;
 }
 
 void

@@ -112,11 +112,19 @@ void HalvingDoubling::run(EventType event, CallData* data) {
         ready();
         iteratable();
     } else if (event == EventType::PacketReceived) {
-        total_packets_received++;
-        // wait for all flows of this round to finish before starting next round
+        // wait for all flows of this round (at other ranks) to finish before starting next round
         // especially important when simulating congestion with sequential flows
+
+        reconfigSched::getScheduler().sync(this); // we're noting, that this algo has reached here
+        return;
+    }
+    else if(event == EventType::SyncBarrier){
+        // this is our “wake‐up” from the scheduler
+        // all ranks have hit the barrier -> send
+        total_packets_received++;
         insert_packet(nullptr);
-    } else if (event == EventType::StreamInit) {
+    }
+    else if (event == EventType::StreamInit) {
         for (int i = 0; i < parallel_reduce; i++) {
             insert_packet(nullptr);
         }
