@@ -1,0 +1,10 @@
+h
+schemaê1.0.2-chakra.0.0.4G
+
+input_fileê8MICRO
+1
+conv1 -1 5 NONE 0 5 NONE 0 5  ALLGATHER 16000 5
+C
+COMM_COLL_NODE_conv1_ALLGATHERR
+	comm_typeHR
+	comm_sizeH€}
