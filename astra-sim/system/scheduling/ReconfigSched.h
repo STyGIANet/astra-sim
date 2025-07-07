@@ -40,6 +40,9 @@ class reconfigSched {
         bool reconfigure(const Algorithm* algo, int roundNum, uint64_t messageSize);
         int64_t getReconfigDelay (); // depends on ocsnode. Is called by algo so it knows when to schedule send for next round after reconfig
 
+        // setter to pass a reconfiguration decision schedule externally (parsed from topology file)
+        void setReconfigDecisionPerRound(const std::vector<bool>& shouldReconfig);
+
     private: 
         // hidden as singleton
         reconfigSched();
@@ -61,6 +64,9 @@ class reconfigSched {
         bool                                    m_isDemandAware; // whether demand-aware OCS is in use, otherwise demand-oblivious with static timetable and this scheduler isn't required
         int                                     m_syncRoundsSeen; // how many nodes have already called sync for this round.
         std::vector<Algorithm*>                 m_algos; // all algos registered to this scheduler
+        
+        // externally provided schedule of whether to reconfigure in each round
+        std::vector<bool>                       m_shouldReconfig;
 };
 
 }  // namespace AstraSim

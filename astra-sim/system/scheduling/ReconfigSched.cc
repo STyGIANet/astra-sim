@@ -26,6 +26,13 @@ reconfigSched::~reconfigSched(){
 }
 
 void
+reconfigSched::setReconfigDecisionPerRound(const std::vector<bool>& shouldReconfig)
+{
+  m_shouldReconfig = shouldReconfig;
+}
+
+
+void
 reconfigSched::setOCSNode(OCSNode* ocs)
 {
   m_ocs = ocs;
@@ -143,11 +150,12 @@ reconfigSched::roundToPortMap(int round)
 bool
 reconfigSched::reconfigure (const Algorithm* algo, int roundNum, uint64_t messageSize)
 {
-  int64_t rDelayNs = getReconfigDelay();
+  
 
 // TODO ensure messagesize in bits, or convert to bits; bandwdith is in bps.
   //if (rDelayNs < (m_bandwidthBps * messageSize) * (calcCongestionFactor(algo, roundNum) - 1)){
-  if (true){ //testing
+  if (false){ //testing
+    int64_t rDelayNs = getReconfigDelay();
     if (m_allRoundsPortMaps.size() == 0)
     {
         setMatchings(algo,0); // unsure if rootNodeId ever changes
