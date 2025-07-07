@@ -57,14 +57,21 @@ bool reconfigSched::sync(Algorithm* algo)
   // once we've seen all ranks, fire exactly N SyncBarrier events
   if (m_syncRoundsSeen >= hd->nodes_in_ring) {
       for (auto* a : m_algos) {
+          int64_t syncInNS = 0;
+          if (m_isDemandAware){
+            int curRound = hd->total_rounds - hd->stream_count;
+            if(curRound < 0 || (m_isDemandAware && curRound >= m_shouldReconfig.size())){
+              printf("HalvingDoubling round not in schedule. Check reconfig_per_round of reconfig file. \n");
+              exit(-706);
+            }
+            if(m_shouldReconfig[curRound] == true){
+              syncInNS = getReconfigDelay();
+            }
+          }
 
-          ns3::Simulator::Schedule(ns3::NanoSeconds(0), [a]() {
+          ns3::Simulator::Schedule(ns3::NanoSeconds(syncInNS), [a]() {
               a->run(EventType::SyncBarrier, nullptr);
           });
-
-          // ns3::Simulator::ScheduleNow([a](){
-          //   a->run(EventType::SyncBarrier, nullptr);
-          //   });
       }
 
       // reset for next round
