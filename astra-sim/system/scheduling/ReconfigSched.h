@@ -37,7 +37,7 @@ class reconfigSched {
         / Returns the decision if to reconfigure for this round and instructs the OCS to reconfigure to the required portMap
         / if we reconfigure here, then the algorithm need to wait reconfigDelay ns before transmitting the next round
         */
-        bool reconfigure(const Algorithm* algo, int roundNum, uint64_t messageSize);
+        int64_t reconfigure(const Algorithm* algo, int roundNum);
         int64_t getReconfigDelay (); // depends on ocsnode. Is called by algo so it knows when to schedule send for next round after reconfig
 
         // setter to pass a reconfiguration decision schedule externally (parsed from topology file)
@@ -64,7 +64,7 @@ class reconfigSched {
         bool                                    m_isDemandAware; // whether demand-aware OCS is in use, otherwise demand-oblivious with static timetable and this scheduler isn't required
         int                                     m_syncRoundsSeen; // how many nodes have already called sync for this round.
         std::vector<Algorithm*>                 m_algos; // all algos registered to this scheduler
-        
+
         // externally provided schedule of whether to reconfigure in each round
         std::vector<bool>                       m_shouldReconfig;
 };

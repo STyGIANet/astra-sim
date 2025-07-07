@@ -58,14 +58,16 @@ bool reconfigSched::sync(Algorithm* algo)
   if (m_syncRoundsSeen >= hd->nodes_in_ring) {
       for (auto* a : m_algos) {
           int64_t syncInNS = 0;
-          if (m_isDemandAware){
-            int curRound = hd->total_rounds - hd->stream_count;
-            if(curRound < 0 || (m_isDemandAware && curRound >= m_shouldReconfig.size())){
-              printf("HalvingDoubling round not in schedule. Check reconfig_per_round of reconfig file. \n");
+          int curRound = hd->total_rounds - hd->stream_count;
+          if (m_isDemandAware && curRound < m_shouldReconfig.size()){
+            if(curRound < 0){
+              printf("ReconfigSched detected negative current round number.\n");
               exit(-706);
             }
             if(m_shouldReconfig[curRound] == true){
-              syncInNS = getReconfigDelay();
+              printf("%d: RECONFIGURING ACCORDING TO SCHEDULLLEEEEE", ns3::Simulator::Now().GetTimeStep());
+              fflush(stdout);
+              syncInNS = reconfigure(hd,curRound);
             }
           }
 
@@ -88,48 +90,55 @@ reconfigSched::setMatchings(const Algorithm* algo, int rootNodeId)
     if (algo->name == Algorithm::Name::HalvingDoubling){
         const HalvingDoubling* hd = dynamic_cast<const HalvingDoubling*>(algo);
         if (hd == nullptr) {
-            printf("ReconfigSched: Collective Communication Algorithm Name and Typ mismatch. Something is wrong.");
+            printf("ReconfigSched: Algorithm Name/Type mismatch.\n");
             exit(-707);
         }
 
-        // check if this really applies for all ComTypes in HalvingDoubling
-        // its source code suggests it doesn't always create pairs like this
-
-        int num = (int) hd->nodes_in_ring;
-        int R = reconfigSched::ceil_log2(num);
+        int N = static_cast<int>(hd->nodes_in_ring);
+        int R = ceil_log2(N);
         int maxRounds = hd->total_rounds;
 
-
-        if ( !( (1u << R) == num) ){
-            // further calculations are based on assumption of nodeNum == 2^roundNum
-            printf("ReconfigSched: Number of nodes is not a power of 2.");
+        if ((1u << R) != N) {
+            printf("ReconfigSched: Number of nodes (%d) is not a power of 2.\n", N);
+            exit(-708);
         }
 
-        // important assumption: For all ports at OCS: portNum == connected NodeId and NodeId \in {0,1,...,n-1} continuous
-        // TODO check/verify this assumption before continuing
+        for (int curRound = 0; curRound < maxRounds; ++curRound) {
+            uint64_t dist = halvingDoublingDist(curRound, N, hd->comType);
 
-        uint64_t dist = 0;
-        int logicalSrc, logicalDst;
-        bool clockwiseDirection;
-        for (int curRound = 0; curRound < maxRounds; curRound++){
-            dist = reconfigSched::halvingDoublingDist(curRound, num, hd->comType);
-            for (int src = 0; src < num; src++){
-                clockwiseDirection = ( src == 0 || (src / dist) % 2 == 0 );
-                logicalSrc = (src - rootNodeId + num) % num; //shifting by rootNodeId
-                if (clockwiseDirection){
-                    logicalDst = (logicalSrc + dist) % num;
+            for (int src = 0; src < N; ++src) {
+                // Determine communication partner
+                bool clockwise = (src == 0 || (src / dist) % 2 == 0);
+                int logicalSrc = (src - rootNodeId + N) % N;
+                int logicalDst;
+
+                if (clockwise) {
+                    logicalDst = (logicalSrc + dist) % N;
+                } else {
+                    logicalDst = (logicalSrc + N - dist) % N;
                 }
-                else{ //counter clockwise
-                    logicalDst = (logicalSrc + num - dist ) % num;
-                }
-                m_allRoundsPortMaps[curRound][static_cast<uint32_t>(src)] = ((logicalDst + rootNodeId) % num);
+
+                int realSrc = (logicalSrc + rootNodeId) % N;
+                int realDst = (logicalDst + rootNodeId) % N;
+
+                uint32_t src_tx_port = realSrc;
+                uint32_t src_rx_port = realSrc + N;
+                uint32_t dst_tx_port = realDst;
+                uint32_t dst_rx_port = realDst + N;
+
+                // Bidirectional mappings for this round
+                m_allRoundsPortMaps[curRound][src_tx_port] = dst_rx_port;
+                m_allRoundsPortMaps[curRound][dst_rx_port] = src_tx_port;
+                m_allRoundsPortMaps[curRound][src_rx_port] = dst_tx_port;
+                m_allRoundsPortMaps[curRound][dst_tx_port] = src_rx_port;
             }
         }
-    }
-    else{
-        //TODO implement other algos
+    } else {
+        printf("ReconfigSched: Algorithm not supported in setMatchings().\n");
+        exit(-709);
     }
 }
+
 
 void 
 reconfigSched::setDaMode(bool isDemandAware)
@@ -158,25 +167,17 @@ reconfigSched::roundToPortMap(int round)
   }
 }
 
-bool
-reconfigSched::reconfigure (const Algorithm* algo, int roundNum, uint64_t messageSize)
+int64_t
+reconfigSched::reconfigure(const Algorithm* algo, int roundNum)
 {
-  
-
-// TODO ensure messagesize in bits, or convert to bits; bandwdith is in bps.
-  //if (rDelayNs < (m_bandwidthBps * messageSize) * (calcCongestionFactor(algo, roundNum) - 1)){
-  if (false){ //testing
     int64_t rDelayNs = getReconfigDelay();
     if (m_allRoundsPortMaps.size() == 0)
     {
         setMatchings(algo,0); // unsure if rootNodeId ever changes
     }
     m_ocs->Reconfigure(roundToPortMap(roundNum));
-    // the caller has to ensure to wait until reconfiguration is done until starting transmission, we don't do any blocking here
-    return true;
-  }
 
-  return false;
+  return rDelayNs;
 }
 
 // returns the delay in nanoseconds
@@ -219,7 +220,7 @@ reconfigSched::halvingDoublingDist(int round, int nodes, AstraSim::ComType type)
 
       case ComType::All_Gather:
         // start at n/2, then n/4, …, n/(2^R)
-        return uint64_t(nodes) >> round;
+        return uint64_t(nodes) >> (round+1);
 
       default:
         printf("ReconfigSched: Unknown Communication Type in halvingDoublingDist");
