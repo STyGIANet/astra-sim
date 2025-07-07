@@ -55,20 +55,24 @@ bool reconfigSched::sync(Algorithm* algo)
   m_syncRoundsSeen++;
 
   // once we've seen all ranks, fire exactly N SyncBarrier events
-  if (m_syncRoundsSeen >= hd->nodes_in_ring)
-  {
-    for (auto *a : m_algos)
-    {
-      ns3::Simulator::ScheduleNow([a](){
-        a->run(EventType::SyncBarrier, nullptr);
-        });
-        }
-      // 3) reset for next round
+  if (m_syncRoundsSeen >= hd->nodes_in_ring) {
+      for (auto* a : m_algos) {
+
+          ns3::Simulator::Schedule(ns3::NanoSeconds(0), [a]() {
+              a->run(EventType::SyncBarrier, nullptr);
+          });
+
+          // ns3::Simulator::ScheduleNow([a](){
+          //   a->run(EventType::SyncBarrier, nullptr);
+          //   });
+      }
+
+      // reset for next round
       m_syncRoundsSeen = 0;
       m_algos.clear();
       return true;
-    }
-    return false;
+  }
+  return false;
 }
 
 void
