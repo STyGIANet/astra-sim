@@ -265,7 +265,7 @@ bool HalvingDoubling::ready() {
     // optional demand-aware reconfiguration between rounds
     reconfigSched& sched = reconfigSched::getScheduler();
     Tick delay = 0; // used to wait for reconfiguration to finish before sending
-    if (sched.getDaMode() == true){
+    if (false){//sched.getDaMode() == true){
         int curRoundNum = total_rounds - stream_count;
         bool isReconfiguring = sched.reconfigure(this, curRoundNum, packet.msg_size);
         delay = isReconfiguring ? sched.getReconfigDelay() : 0;
