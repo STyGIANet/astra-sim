@@ -7,6 +7,10 @@ add_if_missing() {
   grep -qxF "$1" "$2" || echo "$1" >> "$2"
 }
 
+add_if_missing_path() {
+  grep -qF "$1" "$3" || echo "$2" >> "$3"
+}
+
 # Compile Abseil
 cd /opt
 export ABSL_VER=20240722.0
@@ -26,6 +30,8 @@ sudo cmake --build . --target install --config Release --parallel $(nproc)
 add_if_missing "export absl_DIR="/opt/abseil-cpp-${ABSL_VER}/install"" $PROTOCPATH
 
 add_if_missing "export absl_DIR="/opt/abseil-cpp-${ABSL_VER}/install"" $BASHRC
+
+add_if_missing_path 'PATH=/opt/abseil-cpp' "export PATH="/opt/abseil-cpp-${ABSL_VER}/install:$PATH"" $BASHRC
 
 source $PROTOCPATH
 echo "##############################"
@@ -53,5 +59,5 @@ sudo cmake --build . --target install --config Release --parallel $(nproc)
 add_if_missing "export protobuf_DIR="/opt/protobuf-${PROTOBUF_VER}/install"" $PROTOCPATH
 add_if_missing "export protobuf_DIR="/opt/protobuf-${PROTOBUF_VER}/install"" $BASHRC
 
-add_if_missing "export PATH="/opt/protobuf-${PROTOBUF_VER}/install/bin:$PATH"" $BASHRC
-add_if_missing "export PATH="/opt/protobuf-${PROTOBUF_VER}/install/bin:$PATH"" $PROTOCPATH
+add_if_missing_path 'PATH=/opt/protobuf-' "export PATH="/opt/protobuf-${PROTOBUF_VER}/install/bin:$PATH"" $BASHRC
+add_if_missing_path 'PATH=/opt/protobuf-' "export PATH="/opt/protobuf-${PROTOBUF_VER}/install/bin:$PATH"" $PROTOCPATH

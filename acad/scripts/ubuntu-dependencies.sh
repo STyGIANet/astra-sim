@@ -30,7 +30,12 @@ add_if_missing() {
   grep -qxF "$1" "$PROFILE" || echo "$1" >> "$PROFILE"
 }
 
-add_if_missing 'export PATH="$HOME/.pyenv/bin:$PATH"'
+add_if_missing_path() {
+  grep -qF "$1" "$PROFILE" || echo "$2" >> "$PROFILE"
+}
+
+add_if_missing_path 'pyenv/bin' 'export PATH="$HOME/.pyenv/bin:$PATH"'
+add_if_missing 'export PROTOBUF_FROM_SOURCE="True"'
 add_if_missing 'eval "$(pyenv init -)"'
 add_if_missing 'eval "$(pyenv virtualenv-init -)"'
 
@@ -45,7 +50,8 @@ echo "Installing Python 3.10.18..."
 pyenv install 3.10.18
 cd $PROJECT_DIR
 $HOME/.pyenv/versions/3.10.18/bin/python -m venv .venv
-source .venv/bin/activate && export PS1='[$(realpath --relative-to="$PROJECT_DIR" "$PWD")] astra-sim> '
+source .venv/bin/activate
+# export PS1='[$(realpath --relative-to="$PROJECT_DIR" "$PWD")] astra-sim> '
 ##################################################
 
 sudo apt -y install openmpi-bin openmpi-doc libopenmpi-dev
@@ -60,7 +66,8 @@ pip3 install graphviz pydot
 cd $PROJECT_DIR
 ./utils/install_chakra.sh
 cd .venv/bin
-source activate && export PS1='[$(realpath --relative-to="$PROJECT_DIR" "$PWD")] astra-sim> '
+source activate
+# export PS1='[$(realpath --relative-to="$PROJECT_DIR" "$PWD")] astra-sim> '
 source ~/.protocPaths
 cd $PROJECT_DIR/.venv
 find . -name "*_pb2.py" -delete && find . -name "*.proto" -exec bash -c 'for f; do d=$(dirname "$f"); b=$(basename "$f"); /opt/protobuf-28.3/install/bin/protoc --proto_path="$d" --python_out="$d" "$b"; done' bash {} +
