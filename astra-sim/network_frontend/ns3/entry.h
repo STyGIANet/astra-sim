@@ -120,6 +120,8 @@ map<MsgEventKey, MsgEvent> sim_recv_waiting_hash;
 //   System layer has not yet called sim_recv
 map<MsgEventKey, int> received_msg_standby_hash;
 
+unordered_map<uint32_t, uint32_t> flowInWindow;
+
 // send_flow commands the ns3 simulator to schedule a RDMA message to be sent
 // between two pair of nodes. send_flow is triggered by sim_send.
 void send_flow(int src_id, int dst, int maxPacketCount,
@@ -218,6 +220,8 @@ void notify_receiver_receive_data(int src_id, int dst_id, int message_size,
     if (message_size == recv_expect_event.remaining_msg_bytes) {
       // We received exactly the amount of data what Sys object was expecting.
       sim_recv_waiting_hash.erase(recv_expect_event_key);
+      if (flowInWindow[dst_id] > 0)
+        flowInWindow[dst_id]--;
       recv_expect_event.callHandler();
     } else if (message_size > recv_expect_event.remaining_msg_bytes) {
       // We received more packets than the Sys object is expecting.
@@ -226,6 +230,8 @@ void notify_receiver_receive_data(int src_id, int dst_id, int message_size,
       received_msg_standby_hash[recv_expect_event_key] =
           message_size - recv_expect_event.remaining_msg_bytes;
       sim_recv_waiting_hash.erase(recv_expect_event_key);
+      if (flowInWindow[dst_id] > 0)
+        flowInWindow[dst_id]--;
       recv_expect_event.callHandler();
     } else {
       // There are still packets to arrive.
