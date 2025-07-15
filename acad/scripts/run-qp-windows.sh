@@ -12,8 +12,8 @@ ALGS=("ethereal" "spray" "none")
 WINDOWS=(16 32 64 128 256)
 # Recompile ns3
 cd ${SCRIPT_DIR}
-# ./build.sh -l
-# ./build.sh -c
+./build.sh -l
+./build.sh -c
 ##############################################################################
 # leaf-spine topology with 256 nodes
 # Allreduce across various message sizes and load balancing algorithms
@@ -56,10 +56,10 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 
 				WORKLOAD=${ET_WORKLOAD_DIR}/AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine
 				SYSTEM=${SYSTEM_DIR}/system-$ALLREDUCE_ALG-$APP_LOADBALANCE_ALG.json
-				NETWORK=${NETWORK_DIR}/config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+				NETWORK=${NETWORK_DIR}/config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}-${WINDOW}.txt
 				MEMORY=${MEMORY_DIR}/remote_memory.json
 				LOGICAL_TOPOLOGY=${LOGICAL_TOPO_DIR}/logical-topo-$NUM_NODES.json
-				OUTPUT_FILE=${RESULTS_DIR}/AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine-$ALG-$ALLREDUCE_ALG.out
+				OUTPUT_FILE=${RESULTS_DIR}/AllReduce-$NUM_NODES-$MSG_SIZE-leaf-spine-$ALG-$ALLREDUCE_ALG-$WINDOW.out
 
 				cd ${PROJECT_DIR}
 				if [[ $EXP == 1 ]];then
