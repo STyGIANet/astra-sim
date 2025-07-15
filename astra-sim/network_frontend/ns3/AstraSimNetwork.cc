@@ -276,9 +276,22 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                     if (newkeys.size()) {
                         for (int dst : newkeys){
                             auto& flow_vec = send_flow_args[dst];
-                            if (flowInWindow[rank] + flow_vec.size() <= totalWindowFlows) {
+                            std::vector<uint32_t> goodPaths;
+                            for (uint32_t p = 0; p < pathMatrix[dst].size();
+                                 p++) {
+                                if (!pathMatrix[dst][p].IsPending()) {
+                                    goodPaths.emplace_back(p);
+                                }
+                            }
+                            uint32_t numFlows = flow_vec.size();
+                            uint32_t s = goodPaths.size();
+                            uint32_t r = numFlows % s;
+                            uint32_t g = gcd(r, s);
+                            uint64_t numSplit = s / g;
+                            uint32_t totalNewFlows = numFlows + r*(numSplit - 1);
+                            if (flowInWindow[rank] + totalNewFlows <= totalWindowFlows) {
+                                flowInWindow[rank] += totalNewFlows;
                                 keys.push_back(dst);
-                                flowInWindow[rank] += flow_vec.size();
                             }
                         }
                         // std::cout << "flowInWindow " << flowInWindow[rank] << " rank " << rank << std::endl;
@@ -619,7 +632,7 @@ bool rendezvous_protocol = false;
 auto logical_dims = vector<int>();
 int num_npus = 1;
 auto queues_per_dim = vector<int>();
-uint32_t windowSizeEthereal = 64;
+uint32_t qpwindowSize = 64;
 
 // TODO: Migrate to yaml
 void read_logical_topo_config(string network_configuration,
@@ -683,8 +696,8 @@ void parse_args(int argc, char* argv[]) {
                  rendezvous_protocol);
     cmd.AddValue("linkFailure", "whether to simulate link failure, 1=Failure, 0=normal", link_failure);
 
-    cmd.AddValue("windowSizeEthereal", "Window size for Ethereal load balancing",
-                 windowSizeEthereal);
+    cmd.AddValue("qpwindowSize", "Window size for number of QPs",
+                 qpwindowSize);
 
     cmd.Parse(argc, argv);
 }
@@ -717,7 +730,7 @@ int main(int argc, char* argv[]) {
         // STyGIANet
         if (networks[npu_id]->etherealEnabled()) {
             networks[npu_id]->set_n_ranks(num_npus);
-            networks[npu_id]->setWindow(windowSizeEthereal);
+            networks[npu_id]->setWindow(qpwindowSize);
         }
     }
     std::cout << "System Initialized!" << std::endl;
@@ -754,6 +767,9 @@ int main(int argc, char* argv[]) {
                     "resetLinkFailure",
                     MakeCallback(&ASTRASimNetwork::resetLinkFailure,
                                  networks[i]));
+        }
+        else{
+            RdmaEgressQueue::qpWindow = qpwindowSize;
         }
         systems[i]->workload->fire();
     }
