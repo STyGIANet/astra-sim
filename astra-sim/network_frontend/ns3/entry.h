@@ -220,8 +220,6 @@ void notify_receiver_receive_data(int src_id, int dst_id, int message_size,
     if (message_size == recv_expect_event.remaining_msg_bytes) {
       // We received exactly the amount of data what Sys object was expecting.
       sim_recv_waiting_hash.erase(recv_expect_event_key);
-      if (flowInWindow[dst_id] > 0)
-        flowInWindow[dst_id]--;
       recv_expect_event.callHandler();
     } else if (message_size > recv_expect_event.remaining_msg_bytes) {
       // We received more packets than the Sys object is expecting.
@@ -230,8 +228,6 @@ void notify_receiver_receive_data(int src_id, int dst_id, int message_size,
       received_msg_standby_hash[recv_expect_event_key] =
           message_size - recv_expect_event.remaining_msg_bytes;
       sim_recv_waiting_hash.erase(recv_expect_event_key);
-      if (flowInWindow[dst_id] > 0)
-        flowInWindow[dst_id]--;
       recv_expect_event.callHandler();
     } else {
       // There are still packets to arrive.
@@ -304,9 +300,9 @@ void qp_finish_print_log(FILE *fout, Ptr<RdmaQueuePair> q) {
                                         // required (with header but no INT)
   uint64_t standalone_fct = base_rtt + total_bytes * 8000000000lu / b;
   // sip, dip, sport, dport, size (B), start_time, fct (ns), standalone_fct (ns)
-  fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu %lu %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(),
+  fprintf(fout, "%08x %08x %u %u %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu\n", q->sip.Get(), q->dip.Get(),
           q->sport, q->dport, q->m_size, q->startTime.GetNanoSeconds(),
-          (Simulator::Now() - q->startTime).GetNanoSeconds(), standalone_fct, Simulator::Now().GetNanoSeconds(), q->m_src, q->m_dest, q->maxQps, q->GetTag()-500000000);
+          (Simulator::Now() - q->startTime).GetNanoSeconds(), standalone_fct, Simulator::Now().GetNanoSeconds(), q->m_src, q->m_dest, q->maxQps, q->GetTag()-500000000, flowInWindow[sid]);
   fflush(fout);
 }
 
@@ -331,6 +327,9 @@ void qp_finish(FILE *fout, Ptr<RdmaQueuePair> q) {
   }
   int tag = sender_src_port_map[make_pair(q->sport, make_pair(sid, did))];
   sender_src_port_map.erase(make_pair(q->sport, make_pair(sid, did)));
+
+  if (flowInWindow[sid] > 0)
+        flowInWindow[sid]--;
 
   // Let sender knows that the flow has finished.
   notify_sender_sending_finished(sid, did, q->m_size, tag, q->sport);
