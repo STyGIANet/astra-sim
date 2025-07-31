@@ -45,6 +45,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         nRanks = 0;
         demandArray.clear();
         m_rand = CreateObject<UniformRandomVariable>();
+
+        flowInWindow[rank] = 0;
     }
 
     ~ASTRASimNetwork() {
@@ -261,13 +263,39 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                     // Ethereal
 
                     // Randomize the destinations to avoid synchronization
-                    std::vector<int> keys;
+                    std::vector<int> newkeys;
                     for (const auto& [dst, flow_vec] : send_flow_args) {
-                        keys.push_back(dst);
+                        newkeys.push_back(dst);
                     }
                     std::random_device rd;
                     std::mt19937 gen(rank);
-                    std::shuffle(keys.begin(), keys.end(), gen);
+                    std::shuffle(newkeys.begin(), newkeys.end(), gen);
+
+                    // int window = 1;
+                    std::vector<int> keys;
+                    if (newkeys.size()) {
+                        for (int dst : newkeys){
+                            auto& flow_vec = send_flow_args[dst];
+                            std::vector<uint32_t> goodPaths;
+                            for (uint32_t p = 0; p < pathMatrix[dst].size();
+                                 p++) {
+                                if (!pathMatrix[dst][p].IsPending()) {
+                                    goodPaths.emplace_back(p);
+                                }
+                            }
+                            uint32_t numFlows = flow_vec.size();
+                            uint32_t s = goodPaths.size();
+                            uint32_t r = numFlows % s;
+                            uint32_t g = gcd(r, s);
+                            uint64_t numSplit = s / g;
+                            uint32_t totalNewFlows = numFlows + r*(numSplit - 1);
+                            if (flowInWindow[rank] + totalNewFlows <= totalWindowFlows) {
+                                flowInWindow[rank] += totalNewFlows;
+                                keys.push_back(dst);
+                            }
+                        }
+                        // std::cout << "flowInWindow " << flowInWindow[rank] << " rank " << rank << std::endl;
+                    }
 
                     // Load balance
                     for (int dst : keys) {
@@ -418,10 +446,21 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                                 }
                             }
                             flow_vec.clear();
+                            send_flow_args.erase(dst);
                         }
                     }
                     // clear the batch
-                    send_flow_args.clear();
+                    if (send_flow_args.size()){
+                        if (!batchTimer.IsPending()) {
+                            batchTimer = Simulator::Schedule(
+                                NanoSeconds(100), &ASTRASimNetwork::sim_send, this,
+                                nullptr, static_cast<uint64_t>(0), 0, 0, 0, nullptr,
+                                nullptr, nullptr);
+                        }
+                    }
+                    else{
+                        send_flow_args.clear();
+                    }
                 }
             } else if (message_size > 0) {
                 // ToDO: Find a better way to check rack locality.
@@ -454,6 +493,7 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                     auto fun_arg_tmp = fun_arg;
                     auto tag_tmp = tag;
                     uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
+                    flowInWindow[src_id]++;
                     Simulator::Schedule(NanoSeconds(delay),
                         [=]() { send_flow(src_tmp, dst_tmp, message_size_tmp, msg_handler_tmp, fun_arg_tmp, tag_tmp); });
                     // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
@@ -535,6 +575,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
         return 0;
     }
 
+    void setWindow(uint32_t windowSizeEthereal){
+        totalWindowFlows = windowSizeEthereal;
+    }
+
   private:
     // This 2D array has each row corresponding to a destination ToR and
     // each column corresponding to an uplink. The value at each cell is the
@@ -568,6 +612,8 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
     int nRanks;
 
     Ptr<UniformRandomVariable> m_rand;
+
+    uint32_t totalWindowFlows;
 };
 
 // Command line arguments and default values.
@@ -586,6 +632,7 @@ bool rendezvous_protocol = false;
 auto logical_dims = vector<int>();
 int num_npus = 1;
 auto queues_per_dim = vector<int>();
+uint32_t qpwindowSize = 1024;
 
 
 // TODO: Migrate to yaml
@@ -650,6 +697,9 @@ void parse_args(int argc, char* argv[]) {
                  rendezvous_protocol);
     cmd.AddValue("linkFailure", "whether to simulate link failure, 1=Failure, 0=normal", link_failure);
 
+    cmd.AddValue("qpwindowSize", "Window size for number of QPs",
+                 qpwindowSize);
+
     cmd.Parse(argc, argv);
 }
 
@@ -681,6 +731,7 @@ int main(int argc, char* argv[]) {
         // STyGIANet
         if (networks[npu_id]->etherealEnabled()) {
             networks[npu_id]->set_n_ranks(num_npus);
+            networks[npu_id]->setWindow(qpwindowSize);
         }
     }
     std::cout << "System Initialized!" << std::endl;
@@ -717,6 +768,9 @@ int main(int argc, char* argv[]) {
                     "resetLinkFailure",
                     MakeCallback(&ASTRASimNetwork::resetLinkFailure,
                                  networks[i]));
+        }
+        else{
+            RdmaEgressQueue::qpWindow = qpwindowSize;
         }
         systems[i]->workload->fire();
     }

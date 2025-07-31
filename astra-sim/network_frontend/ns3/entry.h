@@ -120,6 +120,8 @@ map<MsgEventKey, MsgEvent> sim_recv_waiting_hash;
 //   System layer has not yet called sim_recv
 map<MsgEventKey, int> received_msg_standby_hash;
 
+unordered_map<uint32_t, uint32_t> flowInWindow;
+
 // send_flow commands the ns3 simulator to schedule a RDMA message to be sent
 // between two pair of nodes. send_flow is triggered by sim_send.
 void send_flow(int src_id, int dst, int maxPacketCount,
@@ -325,6 +327,9 @@ void qp_finish(FILE *fout, Ptr<RdmaQueuePair> q) {
   }
   int tag = sender_src_port_map[make_pair(q->sport, make_pair(sid, did))];
   sender_src_port_map.erase(make_pair(q->sport, make_pair(sid, did)));
+
+  if (flowInWindow[sid] > 0)
+        flowInWindow[sid]--;
 
   // Let sender knows that the flow has finished.
   notify_sender_sending_finished(sid, did, q->m_size, tag, q->sport);

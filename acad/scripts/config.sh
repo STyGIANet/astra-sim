@@ -37,3 +37,16 @@ fi
 if [[ ! -d $RESULTS_DIR ]]; then
 	mkdir -p $RESULTS_DIR
 fi
+
+cd $PROJECT_DIR
+if [ -f ".venv/bin/activate" ]; then
+	# export VIRTUAL_ENV_DISABLE_PROMPT=1
+	source .venv/bin/activate
+	#export PS1='[$(realpath --relative-to="$PROJECT_DIR" "$PWD")] astra-sim> '
+fi
+
+if [ -f "$HOME/.protocPaths" ]; then
+	source ~/.protocPaths
+fi
+
+cd -
