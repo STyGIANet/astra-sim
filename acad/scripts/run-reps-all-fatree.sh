@@ -79,7 +79,6 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			cd ${PROJECT_DIR}
 			if [[ $EXP == 1 ]];then
 				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
-				        --repsv4=${REPSV4} \
 				        --workload-configuration=${WORKLOAD} \
 				        --system-configuration=${SYSTEM} \
 				        --network-configuration=${NETWORK} \
@@ -145,7 +144,6 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 			cd ${PROJECT_DIR}
 			if [[ $EXP == 1 ]];then
 				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
-						--repsv4=${REPSV4} \
 				        --workload-configuration=${WORKLOAD} \
 				        --system-configuration=${SYSTEM} \
 				        --network-configuration=${NETWORK} \
@@ -214,7 +212,6 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 			cd ${PROJECT_DIR}
 			if [[ $EXP == 1 ]];then
 				(time "${NS3_DIR}"/build/scratch/ns3.42-AstraSimNetwork-optimized \
-						--repsv4=${REPSV4} \
 				        --workload-configuration=${WORKLOAD} \
 				        --system-configuration=${SYSTEM} \
 				        --network-configuration=${NETWORK} \
