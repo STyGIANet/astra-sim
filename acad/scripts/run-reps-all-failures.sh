@@ -4,10 +4,6 @@ EXP=$1
 N_CORES=$2
 # find the absolute path to this script
 source config.sh
-RESULTS_DIR="${PROJECT_DIR:?}/acad/results-failures"
-if [[ ! -d $RESULTS_DIR ]]; then
-	mkdir -p $RESULTS_DIR
-fi
 
 NODES=(256)
 MSG_SIZES=(1000000 2000000 4000000 8000000 16000000 32000000 64000000 128000000 256000000)
