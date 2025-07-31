@@ -289,6 +289,10 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                             uint32_t g = gcd(r, s);
                             uint64_t numSplit = s / g;
                             uint32_t totalNewFlows = numFlows + r*(numSplit - 1);
+                            if (r){
+                                std::cout << "something went wrong!!!" << std::endl;
+                                exit(1);
+                            }
                             if (flowInWindow[rank] + totalNewFlows <= totalWindowFlows) {
                                 flowInWindow[rank] += totalNewFlows;
                                 keys.push_back(dst);
@@ -493,10 +497,19 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                     auto fun_arg_tmp = fun_arg;
                     auto tag_tmp = tag;
                     uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
-                    flowInWindow[src_id]++;
-                    Simulator::Schedule(NanoSeconds(delay),
-                        [=]() { send_flow(src_tmp, dst_tmp, message_size_tmp, msg_handler_tmp, fun_arg_tmp, tag_tmp); });
-                    // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+                    // flowInWindow[src_id]++;
+                    if (flowInWindow[src_id]+1 <= totalWindowFlows){
+                        flowInWindow[src_id]++;
+                        Simulator::Schedule(NanoSeconds(delay),
+                            [=]() { send_flow(src_tmp, dst_tmp, message_size_tmp, msg_handler_tmp, fun_arg_tmp, tag_tmp); });
+                        // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+                    }
+                    else{
+                        Simulator::Schedule(
+                            NanoSeconds(100), &ASTRASimNetwork::sim_send, this,
+                            buffer, message_size, type, dst_id, tag, request,
+                            msg_handler, fun_arg);
+                    }
                 }
             } else {
                 std::cout << "Error in sim_send" << std::endl;
@@ -512,9 +525,125 @@ class ASTRASimNetwork : public AstraSim::AstraNetworkAPI {
                       message_size / numMpRdmaQp + message_size % numMpRdmaQp,
                       msg_handler, fun_arg, tag);
         } else {
-            // std::cout << "Default enabled" << std::endl;
-            // Trigger ns3 to schedule RDMA QP event.
-            send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+            if (message_size > 0){
+                // ToDO: Find a better way to check rack locality.
+                // The following logic is just for simplicilty, it works
+                // based on how we generate FatTree topologies currently.
+                uint32_t nPerTor = (nRanks / nTors);
+                bool rackLocal = ((src_id / nPerTor) == (dst_id / nPerTor));
+                if (!rackLocal) {
+                    // No timer scheduled yet. This is the first message.
+                    // Schedule the timer. Note that we will not send this
+                    // message now. We will send it when the timer triggers.
+                    // Event is scheduled with dummy values. Specifically,
+                    // message_size = 0 to identify the trigger.
+                    if (!batchTimer.IsPending()) {
+                        batchTimer = Simulator::Schedule(
+                            NanoSeconds(100), &ASTRASimNetwork::sim_send, this,
+                            nullptr, static_cast<uint64_t>(0), 0, 0, 0, nullptr,
+                            nullptr, nullptr);
+                    }
+                    // Add the flow to the batch.
+                    send_flow_args[dst_id / nPerTor].emplace_back(
+                        src_id, dst_id, message_size, msg_handler, fun_arg,
+                        tag);
+                } else {
+                    // Rack Local flows can be sent without load balancing.
+                    auto src_tmp = src_id;
+                    auto dst_tmp = dst_id;
+                    auto message_size_tmp = message_size;
+                    auto msg_handler_tmp = msg_handler;
+                    auto fun_arg_tmp = fun_arg;
+                    auto tag_tmp = tag;
+                    uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
+                    // flowInWindow[src_id]++;
+                    if (flowInWindow[src_id]+1 <= totalWindowFlows){
+                        flowInWindow[src_id]++;
+                        Simulator::Schedule(NanoSeconds(delay),
+                            [=]() { send_flow(src_tmp, dst_tmp, message_size_tmp, msg_handler_tmp, fun_arg_tmp, tag_tmp); });
+                        // send_flow(src_id, dst_id, message_size, msg_handler, fun_arg, tag);
+                    }
+                    else{
+                        Simulator::Schedule(
+                            NanoSeconds(100), &ASTRASimNetwork::sim_send, this,
+                            buffer, message_size, type, dst_id, tag, request,
+                            msg_handler, fun_arg);
+                    }
+                }
+            }
+            else if (!batchTimer.IsPending() && message_size == 0){
+                std::vector<int> newkeys;
+                for (const auto& [dst, flow_vec] : send_flow_args) {
+                    newkeys.push_back(dst);
+                }
+                std::random_device rd;
+                std::mt19937 gen(rank);
+                std::shuffle(newkeys.begin(), newkeys.end(), gen);
+
+                // int window = 1;
+                std::vector<int> keys;
+                if (newkeys.size()) {
+                    for (int dst : newkeys){
+                        auto& flow_vec = send_flow_args[dst];
+                        if (flowInWindow[rank] + flow_vec.size() <= totalWindowFlows) {
+                            flowInWindow[rank] += flow_vec.size();
+                            keys.push_back(dst);
+                        }
+                    }
+                    // std::cout << "flowInWindow " << flowInWindow[rank] << " rank " << rank << std::endl;
+                }
+                for (int dst : keys) {
+                    auto& flow_vec = send_flow_args[dst];
+                    // Also randomize the destinations within each
+                    // destination ToR to avoid synchronization
+                    if (randomize){
+                        std::shuffle(flow_vec.begin(), flow_vec.end(), gen);
+                    }
+                    uint32_t numFlows = flow_vec.size();
+                    if (numFlows > 0) {
+                        // Send these flows as usual
+                        for (uint32_t i = 0; i < numFlows; i++) {
+                            auto flow_tmp = flow_vec[i];
+                            auto src_tmp = std::get<0>(flow_tmp);
+                            auto dst_tmp = std::get<1>(flow_tmp);
+                            auto message_size_tmp = std::get<2>(flow_tmp);
+                            auto msg_handler_tmp = std::get<3>(flow_tmp);
+                            auto fun_arg_tmp = std::get<4>(flow_tmp);
+                            auto tag_tmp = std::get<5>(flow_tmp);
+                            // src_id, dst_id, message_size, msg_handler, fun_arg, tag
+                            uint32_t delay = randomize? m_rand->GetInteger(0, 50) : 0;
+                            Simulator::Schedule(NanoSeconds(delay),
+                                [=]() {
+                                    send_flow(src_tmp,
+                                              dst_tmp,
+                                              message_size_tmp,
+                                              msg_handler_tmp,
+                                              fun_arg_tmp,
+                                              tag_tmp);
+                                });
+                        }
+                        flow_vec.clear();
+                        send_flow_args.erase(dst);
+                    }
+                }
+                // clear the batch
+                if (send_flow_args.size()){
+                    if (!batchTimer.IsPending()) {
+                        batchTimer = Simulator::Schedule(
+                            NanoSeconds(100), &ASTRASimNetwork::sim_send, this,
+                            nullptr, static_cast<uint64_t>(0), 0, 0, 0, nullptr,
+                            nullptr, nullptr);
+                    }
+                }
+                else{
+                    send_flow_args.clear();
+                }
+
+            }
+            else {
+                std::cout << "Error in sim_send" << std::endl;
+                exit(0);
+            }
         }
         return 0;
     }
@@ -729,10 +858,10 @@ int main(int argc, char* argv[]) {
         systems[npu_id]->comp_scale = comp_scale;
 
         // STyGIANet
-        if (networks[npu_id]->etherealEnabled()) {
+        // if (networks[npu_id]->etherealEnabled()) {
             networks[npu_id]->set_n_ranks(num_npus);
             networks[npu_id]->setWindow(qpwindowSize);
-        }
+        // }
     }
     std::cout << "System Initialized!" << std::endl;
 
@@ -742,36 +871,31 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // Tell workload layer to schedule first events.
     for (int i = 0; i < num_npus; i++) {
         // STyGIANet
-        // Set topology parameters for Ethereal if enabled.
-        if (networks[i]->etherealEnabled()) {
-            NS_ASSERT_MSG(t1l > 0, "Number of t1 uplinks is not set! This "
-                                   "should be set in the topology file.");
-            NS_ASSERT_MSG(podTors > 0, "Number of ToRs is not set! This should "
-                                       "be set in the topology file.");
-            NS_ASSERT_MSG(allTors > 0, "Number of ToRs is not set! This should "
-                                       "be set in the topology file.");
-            NS_ASSERT_MSG(networks[i]->get_n_ranks() > 0,
-                          "ranks = 0; Number of ranks not set!");
-            networks[i]->set_topo_params(t1l, t2l, podTors, allTors);
-            n.Get(i)
-                ->GetObject<RdmaDriver>()
-                ->m_rdma->TraceConnectWithoutContext(
-                    "linkFailure",
-                    MakeCallback(&ASTRASimNetwork::setLinkFailure,
-                                 networks[i]));
-            n.Get(i)
-                ->GetObject<RdmaDriver>()
-                ->m_rdma->TraceConnectWithoutContext(
-                    "resetLinkFailure",
-                    MakeCallback(&ASTRASimNetwork::resetLinkFailure,
-                                 networks[i]));
-        }
-        else{
-            RdmaEgressQueue::qpWindow = qpwindowSize;
-        }
+        // Set topology parameters
+        NS_ASSERT_MSG(t1l > 0, "Number of t1 uplinks is not set! This "
+                               "should be set in the topology file.");
+        NS_ASSERT_MSG(podTors > 0, "Number of ToRs is not set! This should "
+                                   "be set in the topology file.");
+        NS_ASSERT_MSG(allTors > 0, "Number of ToRs is not set! This should "
+                                   "be set in the topology file.");
+        NS_ASSERT_MSG(networks[i]->get_n_ranks() > 0,
+                      "ranks = 0; Number of ranks not set!");
+        networks[i]->set_topo_params(t1l, t2l, podTors, allTors);
+        n.Get(i)
+            ->GetObject<RdmaDriver>()
+            ->m_rdma->TraceConnectWithoutContext(
+                "linkFailure",
+                MakeCallback(&ASTRASimNetwork::setLinkFailure,
+                             networks[i]));
+        n.Get(i)
+            ->GetObject<RdmaDriver>()
+            ->m_rdma->TraceConnectWithoutContext(
+                "resetLinkFailure",
+                MakeCallback(&ASTRASimNetwork::resetLinkFailure,
+                             networks[i]));
+        // Tell workload layer to schedule first events.
         systems[i]->workload->fire();
     }
 
