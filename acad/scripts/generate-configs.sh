@@ -8,7 +8,7 @@ MSG_SIZES=(1000000 2000000 4000000 8000000 16000000 32000000 64000000 128000000 
 TXT_WORKLOADS=("Gpt_117M")
 ALLREDUCE_ALGS=("direct" "halvingDoubling" "ring" "doubleBinaryTree")
 APP_LOADBALANCE_ALGS=("ethereal" "mp-rdma-2" "mp-rdma-4" "mp-rdma-8" "none")
-ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "END_HOST_SPRAY" "ECMP")
+ROUTING_ALGS=("SOURCE_ROUTING" "REPS" "REPSv4" "END_HOST_SPRAY" "ECMP")
 
 K=8
 NODES_FT=512
@@ -131,6 +131,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 
 			        sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			        sed -i "s|REPS .*|REPS 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			        sed -i "s|REPSv4 .*|REPSv4 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			        sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 
 			        sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
@@ -160,6 +161,7 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 
 			        sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			        sed -i "s|REPS .*|REPS 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			        sed -i "s|REPSv4 .*|REPSv4 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			        sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 
 			        sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-leaf-spine-${NUM_NODES}-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
@@ -188,6 +190,7 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 
 			    sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			    sed -i "s|REPS .*|REPS 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
+			    sed -i "s|REPSv4 .*|REPSv4 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
 
 			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${MSG_SIZE}.txt
@@ -215,6 +218,7 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 
 			    sed -i "s|SOURCE_ROUTING .*|SOURCE_ROUTING 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			    sed -i "s|REPS .*|REPS 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
+			    sed -i "s|REPSv4 .*|REPSv4 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 			    sed -i "s|END_HOST_SPRAY .*|END_HOST_SPRAY 0|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt
 
 			    sed -i "s|${ROUTING} .*|${ROUTING} 1|g" config-fat-tree-$K-${ROUTING}-${APP_LOADBALANCE_ALG}-${ALLREDUCE_ALG}-${TXT_WORKLOAD}.txt

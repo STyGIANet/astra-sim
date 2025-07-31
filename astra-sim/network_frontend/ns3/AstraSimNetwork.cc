@@ -587,6 +587,7 @@ auto logical_dims = vector<int>();
 int num_npus = 1;
 auto queues_per_dim = vector<int>();
 
+
 // TODO: Migrate to yaml
 void read_logical_topo_config(string network_configuration,
                               vector<int>& logical_dims) {
