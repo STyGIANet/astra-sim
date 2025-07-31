@@ -119,6 +119,10 @@ for TXT_WORKLOAD in ${TXT_WORKLOADS[@]};do
 		elif [[ $ALG == "reps" ]];then
 			ROUTING="REPS"
 			APP_LOADBALANCE_ALG="none"
+		elif [[ $ALG == "repsv4" ]];then
+			ROUTING="REPSv4"
+			APP_LOADBALANCE_ALG="none"
+			REPSV4=1
 		elif [[ $ALG == "spray" ]];then
 			ROUTING="END_HOST_SPRAY"
 			APP_LOADBALANCE_ALG="none"
@@ -187,6 +191,10 @@ for MSG_SIZE in ${MSG_SIZES[@]};do
 		elif [[ $ALG == "reps" ]];then
 			ROUTING="REPS"
 			APP_LOADBALANCE_ALG="none"
+		elif [[ $ALG == "repsv4" ]];then
+			ROUTING="REPSv4"
+			APP_LOADBALANCE_ALG="none"
+			REPSV4=1
 		elif [[ $ALG == "spray" ]];then
 			ROUTING="END_HOST_SPRAY"
 			APP_LOADBALANCE_ALG="none"
